@@ -1,4 +1,12 @@
 stages:
+  extract_pref_labels:
+    cmd: Rscript src/extract_pref_labels.r -g vocab/gnd.ttl -o vocab/gnd_pref_labels.arrow
+    deps:
+      - src/extract_pref_labels.r
+      - vocab/gnd.ttl
+    outs:
+      - vocab/gnd_pref_labels.arrow
+
   train:
     cmd: python train.py
     deps:
@@ -10,8 +18,8 @@ stages:
 
   compute_metrics:
     foreach:
-      - validate:
-      - test:
+      - validate
+      - test
     do: 
       cmd:
         - mkdir -p results/${item}/
