@@ -7,14 +7,28 @@ stages:
     outs:
       - vocab/gnd_pref_labels.arrow
 
-  train:
-    cmd: python train.py
-    deps:
-      - train.py
-    params:
-      - params.yaml:
-    outs:
-      - model.pkl
+  index_corpus:
+    foreach:
+      - validate
+      - test
+    do:
+      cmd: 
+        - mkdir -p results/${item}/
+        - >
+          python src/index_corpus.py 
+          --corpus corpora/${task.name}/${item}.tsv.gz
+          --index corpora/${task.name}/${item}.arrow 
+          --pref_labels vocab/gnd_pref_labels.arrow
+          --alpha ${search.alpha}
+          --out results/${item}/predictions.arrow
+          --n_jobs ${search.n_jobs}
+      deps:
+        - src/index_corpus.py
+      params:
+        - search.alpha
+        # search.n_jobs doesn't need to be a dvc dependency, as it has no effect on the output
+      outs:
+        - results/${item}/predictions.arrow
 
   compute_metrics:
     foreach:

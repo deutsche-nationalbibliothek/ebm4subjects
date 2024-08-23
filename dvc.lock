@@ -1,0 +1,167 @@
+schema: '2.0'
+stages:
+  extract_pref_labels:
+    cmd: Rscript src/extract_pref_labels.r -g vocab/gnd.ttl -o vocab/gnd_pref_labels.arrow
+    deps:
+    - path: src/extract_pref_labels.r
+      hash: md5
+      md5: 61e10b4697a6f31dc84554c0891764d1
+      size: 978
+    - path: vocab/gnd.ttl
+      hash: md5
+      md5: a6a6db61f89d43c58dc2f5d4d6180c39
+      size: 53388861
+    outs:
+    - path: vocab/gnd_pref_labels.arrow
+      hash: md5
+      md5: f0982c75ad669677d810987cb0557302
+      size: 7030402
+  index_corpus@test:
+    cmd:
+    - mkdir -p results/test/
+    - "python src/index_corpus.py  --corpus corpora/title/test.tsv.gz --index corpora/title/test.arrow\
+      \  --pref_labels vocab/gnd_pref_labels.arrow --alpha 0.5 --out results/test/predictions.arrow
+      --n_jobs 20\n"
+    deps:
+    - path: src/index_corpus.py
+      hash: md5
+      md5: f6e3410a9f1e1f7e321b5966191a6717
+      size: 3781
+    params:
+      params.yaml:
+        search.alpha: 0.5
+    outs:
+    - path: results/test/predictions.arrow
+      hash: md5
+      md5: 4bf1bc4060dec6d25573b41e6090b090
+      size: 14826162
+  compute_metrics@test:
+    cmd:
+    - mkdir -p results/test/
+    - "Rscript src/compute_metrics.r  --kind title  --evalset test  --test_index corpora/title/test.arrow
+      --predictions results/test/predictions.arrow --out_folder results/test/\n"
+    deps:
+    - path: corpora/ground-truth.arrow
+      hash: md5
+      md5: 717791c69fedc7d364b38fdaf99fbce5
+      size: 55898370
+    - path: corpora/title/test.arrow
+      hash: md5
+      md5: 36f1e87bbfc0078fecd5ee00bbbdeb80
+      size: 189066
+    - path: results/test/predictions.arrow
+      hash: md5
+      md5: 4bf1bc4060dec6d25573b41e6090b090
+      size: 14826162
+    - path: src/compute_metrics.r
+      hash: md5
+      md5: b9f1011f1778f1cb975c9a9749165ba2
+      size: 4697
+    params:
+      params.yaml:
+        task.kind: title
+        task.name: title
+    outs:
+    - path: results//test/prec_at_5.json
+      hash: md5
+      md5: 21586d4be0aede6e77cb7bc0556f1c23
+      size: 36
+    - path: results//test/rec_at_5.json
+      hash: md5
+      md5: 80f658216fd139566aee1e5959fc13e0
+      size: 35
+    - path: results/test/f1_at_5.json
+      hash: md5
+      md5: b60e69660d0a55a89c1541acbea2dce3
+      size: 35
+    - path: results/test/pr_auc.json
+      hash: md5
+      md5: b8b9a3e3f9abc95b2c8eb0dcfe5c578c
+      size: 29
+    - path: results/test/pr_curve.csv
+      hash: md5
+      md5: f365f083c306af866708edd6a1d8a265
+      size: 3993
+    - path: results/test/pr_curve_plot.svg
+      hash: md5
+      md5: 241267ed67b3372f0039adc1ec824adf
+      size: 17466
+    - path: results/test/rprec_at_5.json
+      hash: md5
+      md5: 1316da9004f8ee1d3db3d4d822502134
+      size: 38
+  index_corpus@validate:
+    cmd:
+    - mkdir -p results/validate/
+    - "python src/index_corpus.py  --corpus corpora/title/validate.tsv.gz --index
+      corpora/title/validate.arrow  --pref_labels vocab/gnd_pref_labels.arrow --alpha
+      0.5 --out results/validate/predictions.arrow --n_jobs 20\n"
+    deps:
+    - path: src/index_corpus.py
+      hash: md5
+      md5: f6e3410a9f1e1f7e321b5966191a6717
+      size: 3781
+    params:
+      params.yaml:
+        search.alpha: 0.5
+    outs:
+    - path: results/validate/predictions.arrow
+      hash: md5
+      md5: 19aabf8e1f63c99bf0ee5e7ba176ff2c
+      size: 127343354
+  compute_metrics@validate:
+    cmd:
+    - mkdir -p results/validate/
+    - "Rscript src/compute_metrics.r  --kind title  --evalset validate  --test_index
+      corpora/title/validate.arrow --predictions results/validate/predictions.arrow
+      --out_folder results/validate/\n"
+    deps:
+    - path: corpora/ground-truth.arrow
+      hash: md5
+      md5: 717791c69fedc7d364b38fdaf99fbce5
+      size: 55898370
+    - path: corpora/title/validate.arrow
+      hash: md5
+      md5: 55b1e3b2c3c27002098d26c8988c1c3c
+      size: 1603378
+    - path: results/validate/predictions.arrow
+      hash: md5
+      md5: 19aabf8e1f63c99bf0ee5e7ba176ff2c
+      size: 127343354
+    - path: src/compute_metrics.r
+      hash: md5
+      md5: b9f1011f1778f1cb975c9a9749165ba2
+      size: 4697
+    params:
+      params.yaml:
+        task.kind: title
+        task.name: title
+    outs:
+    - path: results//validate/prec_at_5.json
+      hash: md5
+      md5: a0d29f9f4021756ac78c14315f1e8b2f
+      size: 37
+    - path: results//validate/rec_at_5.json
+      hash: md5
+      md5: bbcd2e421d982018aa1032a96de6d6b8
+      size: 36
+    - path: results/validate/f1_at_5.json
+      hash: md5
+      md5: db72f9852e0a65eed41e53e30e5248af
+      size: 35
+    - path: results/validate/pr_auc.json
+      hash: md5
+      md5: 6874edbd97c44d02e2e09b3f5b7ac224
+      size: 29
+    - path: results/validate/pr_curve.csv
+      hash: md5
+      md5: e303c86e21e9500e94f6687b3f23515e
+      size: 3983
+    - path: results/validate/pr_curve_plot.svg
+      hash: md5
+      md5: 730cad91ef950407a744792780174de1
+      size: 17478
+    - path: results/validate/rprec_at_5.json
+      hash: md5
+      md5: 09178b7865ee03e3e61bc4c2616b7d57
+      size: 38

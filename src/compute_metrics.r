@@ -62,6 +62,10 @@ plan(multicore, workers = opt$n_jobs)
 # Lese Vorschläge von Attention-XML Test
 message("loading predictions...")
 predicted <- arrow::read_feather(opt$predictions_file)
+predicted <- predicted  |>
+  group_by(doc_id)  |>
+  mutate(rank = min_rank(-score))  |>
+  ungroup()
 
 # Lese Gold-Standard für gesamten Korpus
 message("loading ground truth...")
@@ -81,13 +85,10 @@ predictions_at_5 <- filter(predicted, rank <= 5)
 
 # Berechne die Retrieval Metriken "at 5"
 # mit Konfidenzintervallen
-message("compute set retrieval scores at 5 with CI...")
+message("compute set retrieval scores at 5...")
 res_at_5 <- aeneval::compute_set_retrieval_scores(
   gold_standard,
-  predictions_at_5,
-  compute_bootstrap_ci = TRUE,
-  .verbose = TRUE,
-  .progress = TRUE
+  predictions_at_5
 )
 
 # bringe die Ergebnisse in ein für "dvc metrics" günstiges Format

@@ -11,6 +11,7 @@ dependencies:
   - pyarrow
   - dvc
   - dvc-ssh
+  - tqdm
   
   # compute_metrics.r
   - r-base
