@@ -1,0 +1,13 @@
+md5: 9b39a34ee67f914508deb987b4ea4759
+frozen: true
+deps:
+- path: vocab/gnd.ttl
+  repo:
+    url: git@gitlab.prod.jason.dnb.de:aen/ki-tfidf-dataset.git
+    rev: v3.2.1
+    rev_lock: 71d10964685335189d424f62c7e5d7df53f3a4ef
+outs:
+- md5: a6a6db61f89d43c58dc2f5d4d6180c39
+  size: 53388861
+  hash: md5
+  path: gnd.ttl

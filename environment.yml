@@ -1,0 +1,24 @@
+name: rag-w-gnd
+channels:
+  - conda-forge
+  - aen-forge
+dependencies:
+  - python==3.11
+  - pip
+  - numpy
+  - pandas
+  - requests
+  - pyarrow
+  - dvc
+  - dvc-ssh
+  
+  # compute_metrics.r
+  - r-base
+  - r-aeneval==0.1.14
+  - r-optparse
+  - r-rjson
+  - r-tidyverse
+  - r-arrow
+  - r-svglite
+  - pip:
+    - weaviate-client

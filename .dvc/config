@@ -1,0 +1,10 @@
+[cache]
+    shared = group
+    type = symlink
+    dir = /srv/dvc-cache
+[core]
+    remote = ki0-storage
+['remote "ki0-storage"']
+    url = ssh://aen@evalaenki0.dnb.de/srv/dvc-storage/
+['remote "ki1-storage"']
+    url = ssh://aen@evalaenki1.dnb.de/srv/dvc-storage/

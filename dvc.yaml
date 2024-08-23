@@ -1,0 +1,50 @@
+stages:
+  train:
+    cmd: python train.py
+    deps:
+      - train.py
+    params:
+      - params.yaml:
+    outs:
+      - model.pkl
+
+  compute_metrics:
+    foreach:
+      - validate:
+      - test:
+    do: 
+      cmd:
+        - mkdir -p results/${item}/
+        - >
+          Rscript src/compute_metrics.r 
+          --kind ${task.kind} 
+          --evalset ${item} 
+          --test_index corpora/${task.name}/${item}.arrow
+          --predictions results/${item}/predictions.arrow
+          --out_folder results/${item}/
+      params:
+        - task.name
+        - task.kind
+      deps:
+        - src/compute_metrics.r
+        - results/${item}/predictions.arrow
+        - corpora/${task.name}/${item}.arrow
+        - corpora/ground-truth.arrow
+      outs:
+        - results/${item}/pr_curve_plot.svg:
+            cache: false
+      plots:
+          - results/${item}/pr_curve.csv:
+              x: recall
+              y: precision
+      metrics:
+        - results/${item}/f1_at_5.json:
+            cache: false 
+        - results/${item}/rprec_at_5.json:
+            cache: false 
+        - results//${item}/prec_at_5.json:
+            cache: false 
+        - results//${item}/rec_at_5.json:
+            cache: false 
+        - results/${item}/pr_auc.json:
+            cache: false 
