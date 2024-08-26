@@ -3,5 +3,5 @@ search:
   n_jobs: 10
 
 task:
-  kind: title
-  name: title
+  kind: ft
+  name: ft30k

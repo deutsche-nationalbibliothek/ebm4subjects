@@ -1,14 +1,14 @@
-md5: 8149e55886a56c43e3d82c3683c11cdf
+md5: 210946736299819674184ddefd25201c
 frozen: true
 deps:
-- path: corpora/title
+- path: corpora/ft30k
   repo:
     url: git@gitlab.prod.jason.dnb.de:aen/ki-tfidf-dataset.git
     rev: v3.2.1
     rev_lock: 71d10964685335189d424f62c7e5d7df53f3a4ef
 outs:
-- md5: a96076f88001fccf18ae57830682d231.dir
-  size: 583674698
+- md5: d2824e3b2a4321df78781f5f154c3031.dir
+  size: 13173390617
   nfiles: 22
   hash: md5
-  path: title
+  path: ft30k
