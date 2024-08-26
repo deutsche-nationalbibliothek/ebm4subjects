@@ -20,8 +20,8 @@ stages:
     cmd:
     - mkdir -p results/test/
     - "python src/index_corpus.py  --corpus corpora/title/test.tsv.gz --index corpora/title/test.arrow\
-      \  --pref_labels vocab/gnd_pref_labels.arrow --alpha 0.5 --out results/test/predictions.arrow
-      --n_jobs 40\n"
+      \  --pref_labels vocab/gnd_pref_labels.arrow --alpha 0.6 --out results/test/predictions.arrow
+      --n_jobs 10\n"
     deps:
     - path: src/index_corpus.py
       hash: md5
@@ -29,12 +29,12 @@ stages:
       size: 4333
     params:
       params.yaml:
-        search.alpha: 0.5
+        search.alpha: 0.6
     outs:
     - path: results/test/predictions.arrow
       hash: md5
-      md5: d732f766134da5a9f74693ddbc32121a
-      size: 14825850
+      md5: d7544a9104ff372341cebd5304c77805
+      size: 14874946
   compute_metrics@test:
     cmd:
     - mkdir -p results/test/
@@ -51,8 +51,8 @@ stages:
       size: 189066
     - path: results/test/predictions.arrow
       hash: md5
-      md5: d732f766134da5a9f74693ddbc32121a
-      size: 14825850
+      md5: d7544a9104ff372341cebd5304c77805
+      size: 14874946
     - path: src/compute_metrics.r
       hash: md5
       md5: c5c7c7c747a5ed3d819e4090882f34ed
@@ -64,38 +64,38 @@ stages:
     outs:
     - path: results//test/prec_at_5.json
       hash: md5
-      md5: e48f7e18b4492f9d158837df2dc3c0c7
+      md5: ff26ae6a952988fb24d6271573057d46
       size: 37
     - path: results//test/rec_at_5.json
       hash: md5
-      md5: 653ccc95c0f75f3a3970ccfd0834eadc
+      md5: 1f9345924cf2f8997dc258bbeda2a01d
       size: 36
     - path: results/test/f1_at_5.json
       hash: md5
-      md5: 78287b032c3d234c37e54b2e0c94fbe8
+      md5: 4e743295ee0f6fc4ba69f0bb3b6df675
       size: 35
     - path: results/test/pr_auc.json
       hash: md5
-      md5: 03be08e6342d37f1acf65bd225a7f10e
+      md5: 12364a1030b8962f52942193229f2c0d
       size: 29
     - path: results/test/pr_curve.csv
       hash: md5
-      md5: 1f8261c28c89125447435c9581e64a7d
-      size: 4006
+      md5: 53968e38a1798556976c5a964fbb26e7
+      size: 3978
     - path: results/test/pr_curve_plot.svg
       hash: md5
-      md5: f5c5f34fde60ffd268e6acef4264b7c9
+      md5: d4c7549f73a75d33eaf06c065c568ffa
       size: 17466
     - path: results/test/rprec_at_5.json
       hash: md5
-      md5: 3d2579a6122209c1982834bf4bd89421
+      md5: 919ce6584275d567fd4480b3700902e5
       size: 38
   index_corpus@validate:
     cmd:
     - mkdir -p results/validate/
     - "python src/index_corpus.py  --corpus corpora/title/validate.tsv.gz --index
       corpora/title/validate.arrow  --pref_labels vocab/gnd_pref_labels.arrow --alpha
-      0.5 --out results/validate/predictions.arrow --n_jobs 40\n"
+      0.6 --out results/validate/predictions.arrow --n_jobs 10\n"
     deps:
     - path: src/index_corpus.py
       hash: md5
@@ -103,12 +103,12 @@ stages:
       size: 4333
     params:
       params.yaml:
-        search.alpha: 0.5
+        search.alpha: 0.6
     outs:
     - path: results/validate/predictions.arrow
       hash: md5
-      md5: f17809f91673b21265b8fc2af6749b42
-      size: 127389522
+      md5: cfb6e77d217af5aabe7b4519b4d81e4e
+      size: 128013706
   compute_metrics@validate:
     cmd:
     - mkdir -p results/validate/
@@ -126,8 +126,8 @@ stages:
       size: 1603378
     - path: results/validate/predictions.arrow
       hash: md5
-      md5: f17809f91673b21265b8fc2af6749b42
-      size: 127389522
+      md5: cfb6e77d217af5aabe7b4519b4d81e4e
+      size: 128013706
     - path: src/compute_metrics.r
       hash: md5
       md5: c5c7c7c747a5ed3d819e4090882f34ed
@@ -139,29 +139,29 @@ stages:
     outs:
     - path: results//validate/prec_at_5.json
       hash: md5
-      md5: 1788704a59e973168783e06cc25f287d
+      md5: 499abacfee3b00a649ea1451eca49862
       size: 37
     - path: results//validate/rec_at_5.json
       hash: md5
-      md5: f957dbee629bbb355a4df79cb889489a
+      md5: 49f7b277e88782023c900c4a701996aa
       size: 36
     - path: results/validate/f1_at_5.json
       hash: md5
-      md5: f232a0b39dd545943db3fa41c1f7e928
+      md5: 3380b4b07185fddb5ea651b31ede34ae
       size: 35
     - path: results/validate/pr_auc.json
       hash: md5
-      md5: 6298a3f74bb19d5895a2262e99fcbe18
+      md5: 994356bb5ba2edacfeaed7815f5712f6
       size: 29
     - path: results/validate/pr_curve.csv
       hash: md5
-      md5: 5066e9a8c04c51dcca8fbf9f3a8edf4e
-      size: 3994
+      md5: 2ada9da01a796808ec75beda5b306992
+      size: 3980
     - path: results/validate/pr_curve_plot.svg
       hash: md5
-      md5: bb5dd99d7af8c71eb6b4e5cee166ea58
+      md5: 0ec00bee08672b9f318f3925d1c96d30
       size: 17478
     - path: results/validate/rprec_at_5.json
       hash: md5
-      md5: ac092f046ebf95bff23dfcb363eb4220
-      size: 38
+      md5: 386311f7f76abf5245546135840f2833
+      size: 37
