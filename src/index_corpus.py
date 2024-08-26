@@ -13,13 +13,13 @@ from tqdm import tqdm
 # Create argument parser
 parser = argparse.ArgumentParser(description='Process command line arguments')
 
-# Add arguments
-parser.add_argument('--corpus', type=str, help='Corpus to be indexed')
-parser.add_argument('--index', type=str, help='Index file')
-parser.add_argument('--alpha', type=float, help='Alpha value for hybrid search')
-parser.add_argument('--pref_labels', type=str, help='Data frame with preferred labels')
-parser.add_argument('--n_jobs', type=int, default=10, help='Number of parallel jobs')
-parser.add_argument('--output', type=str, help='Output file')
+# Add arguments with default values
+parser.add_argument('--corpus', type=str, default='corpora/title/test.tsv.gz', help='Corpus to be indexed')
+parser.add_argument('--index', type=str, default='corpora/title/test.arrow', help='Index file')
+parser.add_argument('--alpha', type=float, default=0.0, help='Alpha value for hybrid search')
+parser.add_argument('--pref_labels', type=str, default='vocab/gnd_pref_labels.arrow', help='Data frame with preferred labels')
+parser.add_argument('--n_jobs', type=int, default=20, help='Number of parallel jobs')
+parser.add_argument('--output', type=str, default='results/test/predictions.arrow', help='Output file')
 
 # Parse arguments
 args = parser.parse_args()
@@ -64,8 +64,11 @@ def index_text(text_query, doc_id, wv_collection, alpha, host='8090'):
     )
 
     # group by label_id and only keep rows with the highest score per label_id
-    df = df.sort_values('score', ascending=False).groupby('label_id').head(1)
-    return df.to_dict(orient='records')
+    if not df.empty:
+        df = df.sort_values('score', ascending=False).groupby('label_id').head(1)
+        return df.to_dict(orient='records')
+    else:
+        return {}
 
 # Get the data from the tsv.gz corpus file
 df_documents = pd.read_csv(
@@ -78,7 +81,6 @@ df_documents = pd.read_csv(
 
 df_index = pd.read_feather(index)
 df_documents["doc_id"] = df_index.idn
-# df_documents = df_documents.head(100)
 
 # Define the function to be executed in parallel
 def process_document(row, wv_collection):
