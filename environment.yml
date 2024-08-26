@@ -12,6 +12,7 @@ dependencies:
   - dvc
   - dvc-ssh
   - tqdm
+  - ipykernel # for interactive work in jupyter-notebooks
   
   # compute_metrics.r
   - r-base

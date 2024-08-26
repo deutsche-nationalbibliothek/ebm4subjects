@@ -1,6 +1,6 @@
 search:
   alpha: 0.5
-  n_jobs: 20
+  n_jobs: 40
 
 task:
   kind: title

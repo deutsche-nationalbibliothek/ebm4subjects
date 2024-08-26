@@ -56,7 +56,7 @@ suppressPackageStartupMessages(library(future))
 suppressPackageStartupMessages(library(arrow))
 library(aeneval)
 
-message("Switching to multicore exectution with", opt$n_jobs, "workers.")
+message("Switching to multicore exectution with ", opt$n_jobs, " workers.")
 plan(multicore, workers = opt$n_jobs)
 
 # Lese Vorschläge von Attention-XML Test

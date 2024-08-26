@@ -9,6 +9,7 @@ import sys
 import argparse
 import multiprocessing
 from tqdm import tqdm
+import time
 
 # Create argument parser
 parser = argparse.ArgumentParser(description='Process command line arguments')
@@ -35,12 +36,26 @@ n_jobs = args.n_jobs
 output = args.output
 
 def index_text(text_query, doc_id, wv_collection, alpha, host='8090'):
-    embedding = list(
-        np.array(
-            requests.post(
+    embedding_response = None
+    for _ in range(100):
+        try:
+            embedding_response = requests.post(
                 'http://127.0.0.1:{}/embed'.format(host),
                 headers={"Content-Type": "application/json"},
                 json={'inputs': text_query}).json()
+            break
+        except Exception as e:
+            # print("An error occurred:", str(e))
+            # print("Retrying...")
+            time.sleep(1)
+    
+    if embedding_response is None:
+        print("Failed to get embedding for text query:", text_query, "doc_id:", doc_id)
+        return {}
+
+    embedding = list(
+        np.array(
+            embedding_response
         ).reshape(-1)
     )
 
@@ -94,7 +109,6 @@ def process_document(row, wv_collection):
 
 # Define the function to process a batch of documents
 def process_batch(batch):
-    print("Processing batch of {} documents".format(len(batch)))
     client = weaviate.connect_to_local()
     if not client.is_ready():
       sys.exit("Weaviate client is not ready. Exiting...")
@@ -111,7 +125,7 @@ batches = [df_documents.iloc[i:i + batch_size].to_dict(orient='records') for i i
 
 # Apply the function to each batch in parallel
 with multiprocessing.Pool(processes=n_jobs) as pool:
-    results = pool.map(process_batch, tqdm(batches, total=len(batches)))
+    results = pool.map(process_batch, batches)
 
 # Concatenate the results into a single DataFrame
 df_results = pd.concat([pd.DataFrame(batch_result) for batch_result in results])
