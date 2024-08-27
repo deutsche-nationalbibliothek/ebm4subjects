@@ -10,6 +10,8 @@ import argparse
 import multiprocessing
 from tqdm import tqdm
 import time
+import hashlib
+
 
 # Create argument parser
 parser = argparse.ArgumentParser(description='Process command line arguments')
@@ -18,9 +20,12 @@ parser = argparse.ArgumentParser(description='Process command line arguments')
 parser.add_argument('--corpus', type=str, default='corpora/title/test.tsv.gz', help='Corpus to be indexed')
 parser.add_argument('--index', type=str, default='corpora/title/test.arrow', help='Index file')
 parser.add_argument('--alpha', type=float, default=0.0, help='Alpha value for hybrid search')
+parser.add_argument('--top_k', type=int, default=100, help='Number of top k results to keep')
 parser.add_argument('--pref_labels', type=str, default='vocab/gnd_pref_labels.arrow', help='Data frame with preferred labels')
 parser.add_argument('--n_jobs', type=int, default=20, help='Number of parallel jobs')
 parser.add_argument('--output', type=str, default='results/test/predictions.arrow', help='Output file')
+parser.add_argument('--task', type=str, default='title', help='Task name')
+parser.add_argument('--evalset', type=str, default='test', help='Evaluation set')
 
 # Parse arguments
 args = parser.parse_args()
@@ -29,25 +34,44 @@ args = parser.parse_args()
 corpus = args.corpus
 index = args.index
 alpha = args.alpha
+top_k = args.top_k
 if not FileExistsError(corpus):
     sys.exit("Corpus file does not exist. Exiting...")
 pref_labels = args.pref_labels
 n_jobs = args.n_jobs
 output = args.output
+task = args.task
+evalset = args.evalset
 
-def index_text(text_query, doc_id, wv_collection, alpha, host='8090'):
+def index_chunk(text_query, doc_id, chunk_id, client, alpha, host='8090'):
+    gnd_collection = client.collections.get('Gnd859k_baai_bge_m3')
+    text_collection = client.collections.get(f'{task}_{evalset}_baai_bge_m3')
     embedding_response = None
-    for _ in range(100):
-        try:
-            embedding_response = requests.post(
-                'http://127.0.0.1:{}/embed'.format(host),
-                headers={"Content-Type": "application/json"},
-                json={'inputs': text_query}).json()
-            break
-        except Exception as e:
-            # print("An error occurred:", str(e))
-            # print("Retrying...")
-            time.sleep(1)
+    # check if doc_id and chunk_id are already vectorzied and stored in text_collection
+    text_collection_response = text_collection.query.fetch_objects(
+        filters=(
+            Filter.by_property('doc_id').equal(doc_id) & 
+            Filter.by_property('chunk_id').equal(chunk_id)
+        ),
+        limit=1,
+        include_vector = True
+    )
+    if not text_collection_response.objects:
+        for _ in range(100):
+            try:
+                embedding_response = requests.post(
+                    'http://127.0.0.1:{}/embed'.format(host),
+                    headers={"Content-Type": "application/json"},
+                    json={'inputs': text_query}).json()
+                break
+            except Exception as e:
+                # print("An error occurred:", str(e))
+                # print("Retrying...")
+                time.sleep(1)
+    else:
+        # print("found existing embedding for doc_id:", doc_id, "chunk_id:", chunk_id)
+        embedding_response = text_collection_response.objects[0].vector['default']
+
     
     if embedding_response is None:
         print("Failed to get embedding for text query:", text_query, "doc_id:", doc_id)
@@ -58,8 +82,19 @@ def index_text(text_query, doc_id, wv_collection, alpha, host='8090'):
             embedding_response
         ).reshape(-1)
     )
+    # store embedding in text_collection
+    if not text_collection_response.objects:
+        # print("Storing new embedding for doc_id:", doc_id, "chunk_id:", chunk_id)
+        text_collection.data.insert(
+            properties={
+                'doc_id': doc_id,
+                'chunk_id': chunk_id,
+                'chunk_text': text_query
+            },
+            vector=embedding
+        )
 
-    response = wv_collection.query.hybrid(
+    response = gnd_collection.query.hybrid(
         query=text_query,
         vector=embedding,
         limit=100,
@@ -81,9 +116,40 @@ def index_text(text_query, doc_id, wv_collection, alpha, host='8090'):
     # group by label_id and only keep rows with the highest score per label_id
     if not df.empty:
         df = df.sort_values('score', ascending=False).groupby('label_id').head(1)
-        return df.to_dict(orient='records')
+        return df
     else:
         return {}
+
+def index_text(text: str, doc_id: str, client, alpha: float, top_k: int = 100):
+    # Split the text into chunks of 1000 characters
+    chunks = [text[i:i + 1000] for i in range(0, len(text), 1000)]
+    n_chunks = len(chunks)
+    df = pd.DataFrame(columns=['doc_id', 'label_id', 'score'])
+    i = 0
+    for chunk in chunks:
+        chunk_md5 = hashlib.md5(chunk.encode()).hexdigest()
+        chunk_df = index_chunk(chunk, doc_id, chunk_md5, client, alpha)
+        if not chunk_df.empty:
+            if not df.empty:
+                df = pd.concat([df, chunk_df])
+            else:
+                df = chunk_df
+        i += 1
+
+    df = df.groupby('label_id').agg(
+        score=('score', 'sum'),
+        occurrences=('doc_id', 'count')
+    ).reset_index()
+    df.columns = ['label_id', 'score', 'occurrences']
+    # normalize score by n_chunks
+    df['score'] = df['score'] / n_chunks
+    # add new column doc_id at as first column, filled with the constand value `doc_id` as passed to the function
+    df.insert(0, 'doc_id', doc_id)
+    # arrange by score and keep top K
+    df = df.sort_values('score', ascending=False).head(top_k)
+
+    return df
+
 
 # Get the data from the tsv.gz corpus file
 df_documents = pd.read_csv(
@@ -96,26 +162,31 @@ df_documents = pd.read_csv(
 
 df_index = pd.read_feather(index)
 df_documents["doc_id"] = df_index.idn
+# df_documents = df_documents.head(10)
 
 # Define the function to be executed in parallel
-def process_document(row, wv_collection):
+def process_document(row, client):
     if isinstance(row, dict):
         text_query = row['content']
         doc_id = row['doc_id']
     else:
         text_query = row.content
         doc_id = row.doc_id
-    return index_text(text_query, doc_id, wv_collection, alpha)
+    # print(f"Processing document {doc_id}")
+    return index_text(text_query, doc_id, client, alpha)
 
 # Define the function to process a batch of documents
 def process_batch(batch):
+    # batch_id = multiprocessing.current_process()._identity[0]
+    # print(f"Processing batch {batch_id}")
     client = weaviate.connect_to_local()
+    print(client.is_ready())
     if not client.is_ready():
       sys.exit("Weaviate client is not ready. Exiting...")
-    wv_collection = client.collections.get('Gnd859k_baai_bge_m3')
+    print("Connected to Weaviate")
     result = []
     for row in tqdm(batch, total=len(batch)):
-      result.extend(process_document(row, wv_collection))
+      result.append(process_document(row, client))
     client.close()
     return result
 
@@ -124,12 +195,17 @@ batch_size = len(df_documents) // n_jobs
 batches = [df_documents.iloc[i:i + batch_size].to_dict(orient='records') for i in range(0, len(df_documents), batch_size)]
 
 # Apply the function to each batch in parallel
-with multiprocessing.Pool(processes=n_jobs) as pool:
-    results = pool.map(process_batch, batches)
+parallel = True
+if parallel:
+    with multiprocessing.Pool(processes=n_jobs) as pool:
+        results = pool.map(process_batch, batches)
+else:
+    results = [process_batch(batch) for batch in batches]
 
-# Concatenate the results into a single DataFrame
-df_results = pd.concat([pd.DataFrame(batch_result) for batch_result in results])
+# Concatenate the results
+df_results = pd.concat([pd.concat(result) for result in results])
 
 # Write results arrow file to 'output'
 df_results.to_feather(output)
+
 

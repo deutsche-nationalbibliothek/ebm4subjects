@@ -1,0 +1,22 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python Debugger: Current File with Arguments",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "python": "/home/maximilian/.conda/envs/rag-w-gnd/bin/python",
+      "cwd": "${workspaceFolder}",
+      "args": [
+        "--corpus", "corpora/ft30k/test.tsv.gz",
+        "--index", "corpora/ft30k/test.arrow",
+        "--pref_labels", "vocab/gnd_pref_labels.arrow",
+        "--alpha", "1.0",
+        "--out", "results/test/predictions.arrow",
+        "--n_jobs", "10"
+      ]
+    }
+  ]
+}

@@ -7,6 +7,21 @@ stages:
     outs:
       - vocab/gnd_pref_labels.arrow
 
+  create_collection:
+    foreach:
+      - validate
+      - test
+    do:
+      cmd: python src/create_collection.py --task ${task.name} --evalset ${item} --collection_name_file results/${item}/collection_name.txt
+      deps:
+        - src/create_collection.py
+      params:
+        - task.name
+      outs:
+        - results/${item}/collection_name.txt:
+            cache: false
+
+
   index_corpus:
     foreach:
       - validate
@@ -22,11 +37,15 @@ stages:
           --alpha ${search.alpha}
           --out results/${item}/predictions.arrow
           --n_jobs ${search.n_jobs}
+          --task ${task.name}
+          --evalset ${item}
       deps:
         - src/index_corpus.py
+        - results/${item}/collection_name.txt
       params:
         - search.alpha
         # search.n_jobs doesn't need to be a dvc dependency, as it has no effect on the output
+        - task.name
       outs:
         - results/${item}/predictions.arrow
 
