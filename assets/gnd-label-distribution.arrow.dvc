@@ -1,0 +1,12 @@
+md5: 135b5eeeacb74d55d06e623e1a94adc1
+frozen: true
+deps:
+- path: assets/gnd-label-distribution.arrow
+  repo:
+    url: git@gitlab.prod.jason.dnb.de:aen/comparative-eval.git
+    rev_lock: 1698cdb3d5f3b16657edf50cb8e2cbc379711761
+outs:
+- md5: cf88a4cfcc09c976d6ca2dc193ae9efc
+  size: 2316610
+  hash: md5
+  path: gnd-label-distribution.arrow
