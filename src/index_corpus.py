@@ -21,6 +21,7 @@ parser.add_argument('--corpus', type=str, default='corpora/title/test.tsv.gz', h
 parser.add_argument('--index', type=str, default='corpora/title/test.arrow', help='Index file')
 parser.add_argument('--alpha', type=float, default=0.0, help='Alpha value for hybrid search')
 parser.add_argument('--top_k', type=int, default=100, help='Number of top k results to keep')
+parser.add_argument('--chunk_size', type=int, default=1000, help='Chunk size')
 parser.add_argument('--pref_labels', type=str, default='vocab/gnd_pref_labels.arrow', help='Data frame with preferred labels')
 parser.add_argument('--n_jobs', type=int, default=20, help='Number of parallel jobs')
 parser.add_argument('--output', type=str, default='results/test/predictions.arrow', help='Output file')
@@ -35,6 +36,7 @@ corpus = args.corpus
 index = args.index
 alpha = args.alpha
 top_k = args.top_k
+chunk_size = args.chunk_size
 if not FileExistsError(corpus):
     sys.exit("Corpus file does not exist. Exiting...")
 pref_labels = args.pref_labels
@@ -120,9 +122,9 @@ def index_chunk(text_query, doc_id, chunk_id, client, alpha, host='8090'):
     else:
         return {}
 
-def index_text(text: str, doc_id: str, client, alpha: float, top_k: int = 100):
+def index_text(text: str, doc_id: str, client, alpha: float, top_k: int = 100, chunk_size: int = 1000):
     # Split the text into chunks of 1000 characters
-    chunks = [text[i:i + 1000] for i in range(0, len(text), 1000)]
+    chunks = [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]
     n_chunks = len(chunks)
     df = pd.DataFrame(columns=['doc_id', 'label_id', 'score'])
     i = 0
@@ -173,7 +175,7 @@ def process_document(row, client):
         text_query = row.content
         doc_id = row.doc_id
     # print(f"Processing document {doc_id}")
-    return index_text(text_query, doc_id, client, alpha)
+    return index_text(text_query, doc_id, client, alpha, top_k, chunk_size)
 
 # Define the function to process a batch of documents
 def process_batch(batch):

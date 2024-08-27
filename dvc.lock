@@ -20,8 +20,9 @@ stages:
     cmd:
     - mkdir -p results/test/
     - "python src/index_corpus.py  --corpus corpora/ft30k/test.tsv.gz --index corpora/ft30k/test.arrow\
-      \  --pref_labels vocab/gnd_pref_labels.arrow --alpha 1.0 --out results/test/predictions.arrow
-      --n_jobs 40 --task ft30k --evalset test\n"
+      \  --pref_labels vocab/gnd_pref_labels.arrow --alpha 1.0 --top_k 100 --chunk_size
+      1000 --out results/test/predictions.arrow --n_jobs 40 --task ft30k --evalset
+      test\n"
     deps:
     - path: results/test/collection_name.txt
       hash: md5
@@ -29,11 +30,13 @@ stages:
       size: 22
     - path: src/index_corpus.py
       hash: md5
-      md5: 28e8fda185df8b093d975133da14e7b6
-      size: 7190
+      md5: 9cdfeaa49e04e1921c2a166cd3bffe47
+      size: 7353
     params:
       params.yaml:
         search.alpha: 1.0
+        search.chunk_size: 1000
+        search.top_k: 100
         task.name: ft30k
     outs:
     - path: results/test/predictions.arrow
@@ -100,8 +103,8 @@ stages:
     - mkdir -p results/validate/
     - "python src/index_corpus.py  --corpus corpora/ft30k/validate.tsv.gz --index
       corpora/ft30k/validate.arrow  --pref_labels vocab/gnd_pref_labels.arrow --alpha
-      1.0 --out results/validate/predictions.arrow --n_jobs 40 --task ft30k --evalset
-      validate\n"
+      1.0 --top_k 100 --chunk_size 1000 --out results/validate/predictions.arrow --n_jobs
+      40 --task ft30k --evalset validate\n"
     deps:
     - path: results/validate/collection_name.txt
       hash: md5
@@ -109,11 +112,13 @@ stages:
       size: 26
     - path: src/index_corpus.py
       hash: md5
-      md5: 28e8fda185df8b093d975133da14e7b6
-      size: 7190
+      md5: 9cdfeaa49e04e1921c2a166cd3bffe47
+      size: 7353
     params:
       params.yaml:
         search.alpha: 1.0
+        search.chunk_size: 1000
+        search.top_k: 100
         task.name: ft30k
     outs:
     - path: results/validate/predictions.arrow
@@ -182,10 +187,11 @@ stages:
     deps:
     - path: src/create_collection.py
       hash: md5
-      md5: 6c3753750757870ea38fa46bc0630ff7
-      size: 2871
+      md5: 867f3ca52186b031b5e1984ae21ef117
+      size: 3030
     params:
       params.yaml:
+        collection.overwrite: false
         task.name: ft30k
     outs:
     - path: results/test/collection_name.txt
@@ -198,10 +204,11 @@ stages:
     deps:
     - path: src/create_collection.py
       hash: md5
-      md5: 6c3753750757870ea38fa46bc0630ff7
-      size: 2871
+      md5: 867f3ca52186b031b5e1984ae21ef117
+      size: 3030
     params:
       params.yaml:
+        collection.overwrite: false
         task.name: ft30k
     outs:
     - path: results/validate/collection_name.txt

@@ -8,12 +8,14 @@ parser = argparse.ArgumentParser(description='Process command line arguments')
 # Add arguments with default values
 parser.add_argument('--task', type=str, default='title', help='Task name')
 parser.add_argument('--evalset', type=str, default='test', help='Evaluation set')
+parser.add_argument('--overwrite', type=bool, default=False, help='Overwrite collection if it already exists')
 parser.add_argument('--collection_name_file', type=str, default='results/test/collection_name.txt', help='Output file for collection name')
 
 # Parse arguments
 args = parser.parse_args()
 task = args.task
 evalset = args.evalset
+overwrite = args.overwrite
 collection_name_file = args.collection_name_file
 
 # create a weaviate collection for chunked documents
@@ -71,7 +73,7 @@ client = weaviate.connect_to_local()
 if not client.is_ready():
       sys.exit("Weaviate client is not ready. Exiting...")
 
-collection_name = create_collection(client, task, evalset)
+collection_name = create_collection(client, task, evalset, overwrite=overwrite)
 
 client.close()
 

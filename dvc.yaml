@@ -12,11 +12,13 @@ stages:
       - validate
       - test
     do:
+      always_changed: true
       cmd: python src/create_collection.py --task ${task.name} --evalset ${item} --collection_name_file results/${item}/collection_name.txt
       deps:
         - src/create_collection.py
       params:
         - task.name
+        - collection.overwrite
       outs:
         - results/${item}/collection_name.txt:
             cache: false
@@ -35,6 +37,8 @@ stages:
           --index corpora/${task.name}/${item}.arrow 
           --pref_labels vocab/gnd_pref_labels.arrow
           --alpha ${search.alpha}
+          --top_k ${search.top_k}
+          --chunk_size ${search.chunk_size}
           --out results/${item}/predictions.arrow
           --n_jobs ${search.n_jobs}
           --task ${task.name}
@@ -44,6 +48,8 @@ stages:
         - results/${item}/collection_name.txt
       params:
         - search.alpha
+        - search.top_k
+        - search.chunk_size
         # search.n_jobs doesn't need to be a dvc dependency, as it has no effect on the output
         - task.name
       outs:
