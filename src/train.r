@@ -62,9 +62,6 @@ gnd_label_disribution <- read_feather(
 index_train <- read_feather(opt$train_index)
 candidates_train <- read_feather(opt$train_candidates)
 
-index_validate <- read_feather("corpora/ftoa/validate.arrow")
-candidates_validate <- read_feather("results/validate/candidates.arrow")
-
 message("preparing data...")
 model_data_train <- prepare_data(
   index = index_train,
