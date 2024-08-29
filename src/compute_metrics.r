@@ -3,17 +3,17 @@ library("optparse")
 
 option_list = list(
   make_option(
-    c("--kind"), type = "character", default = "title",
+    c("--kind"), type = "character", default = "ft",
     help = "title or ft",
     metavar = "character"
   ),
   make_option(
-    c("--task"), type = "character", default = "title",
+    c("--task"), type = "character", default = "ft30k",
     help = "name of the task e.g. ft30k or titleoa",
     metavar = "character"
   ),
   make_option(
-    c("--evalset"), type = "character", default = "test",
+    c("--evalset"), type = "character", default = "validate",
     help = "which split to evaluate on, e.g. test or validate",
     metavar = "character"
   ),
@@ -25,19 +25,19 @@ option_list = list(
   ),
   make_option(
     c("--test_index"),
-    type = "character", default = "corpora/title/test.arrow",
+    type = "character", default = "corpora/ft30k/validate.arrow",
     help = "path to the test index file",
     metavar = "character"
   ),
   make_option(
     c("--predictions_file"),
-    type = "character", default = "results/test/predictions.arrow",
+    type = "character", default = "results/validate/predictions.arrow",
     help = "path to the predictions file",
     metavar = "character"
   ),
   make_option(
     c("--out_folder"),
-    type = "character", default = "results/test",
+    type = "character", default = "results/validate",
     help = "path to the output folder",
     metavar = "character"
   ),
