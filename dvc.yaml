@@ -9,11 +9,14 @@ stages:
 
   create_collection:
     foreach:
+      - train
       - validate
       - test
     do:
       always_changed: true
-      cmd: python src/create_collection.py --task ${task.name} --evalset ${item} --collection_name_file results/${item}/collection_name.txt
+      cmd:
+        - mkdir -p results/${item}/ 
+        - python src/create_collection.py --task ${task.name} --evalset ${item} --collection_name_file results/${item}/collection_name.txt --overwrite ${collection.overwrite}
       deps:
         - src/create_collection.py
       params:
@@ -24,8 +27,9 @@ stages:
             cache: false
 
 
-  index_corpus:
+  index_candidates:
     foreach:
+      - train
       - validate
       - test
     do:
@@ -39,7 +43,7 @@ stages:
           --alpha ${search.alpha}
           --top_k ${search.top_k}
           --chunk_size ${search.chunk_size}
-          --out results/${item}/predictions.arrow
+          --out results/${item}/candidates.arrow
           --n_jobs ${search.n_jobs}
           --task ${task.name}
           --evalset ${item}
@@ -52,6 +56,52 @@ stages:
         - search.chunk_size
         # search.n_jobs doesn't need to be a dvc dependency, as it has no effect on the output
         - task.name
+      outs:
+        - results/${item}/candidates.arrow
+
+  train:
+    cmd:
+      - mkdir -p results/train/
+      - >
+        Rscript src/train.r --ground_truth corpora/ground-truth.arrow
+        --train_index corpora/${task.name}/train.arrow
+        --train_candidates results/train/candidates.arrow
+        --label_distribution assets/gnd-label-distribution.arrow
+        --model_file results/train/model.rds
+    deps:
+      - src/train.r
+      - src/prepare_data_for_gbm.r
+      - corpora/ground-truth.arrow
+      - corpora/${task.name}/train.arrow
+      - results/train/candidates.arrow
+      - assets/gnd-label-distribution.arrow
+    outs:
+      - results/train/model.rds
+        
+  predict:
+    foreach:
+      - validate
+      - test
+    do:
+      cmd:
+        - mkdir -p results/${item}/
+        - >
+          Rscript src/predict.r 
+          --model_file results/train/model.rds
+          --test_index corpora/${task.name}/${item}.arrow
+          --test_candidates results/${item}/candidates.arrow
+          --label_distribution assets/gnd-label-distribution.arrow
+          --top_k ${predict.top_k}
+          --out_file results/${item}/predictions.arrow
+      params:
+        - predict.top_k
+      deps:
+        - src/predict.r
+        - src/prepare_data_for_gbm.r
+        - results/train/model.rds
+        - corpora/${task.name}/${item}.arrow
+        - results/${item}/candidates.arrow
+        - assets/gnd-label-distribution.arrow
       outs:
         - results/${item}/predictions.arrow
 

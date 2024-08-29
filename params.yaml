@@ -4,6 +4,9 @@ search:
   chunk_size: 1000
   n_jobs: 40
 
+predict:
+  top_k: 100
+
 task:
   kind: ft
   name: ft30k
