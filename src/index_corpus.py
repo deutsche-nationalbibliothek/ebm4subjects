@@ -176,20 +176,22 @@ def index_text(text: str, doc_id: str, client, alpha: float, top_k: int = 100, c
 
     return df
 
+df_index = pd.read_feather(index)
+if args.max_docs > 0:
+    df_index = df_index.head(args.max_docs)
 
-# Get the data from the tsv.gz corpus file
+# Get the data from the tsv.gz corpus fil
 df_documents = pd.read_csv(
     corpus,
     compression="gzip",
     sep="\t",
     header=None,
     names=["content", "ground_truth"],
+    nrows=df_index.shape[0]
 )
 
-df_index = pd.read_feather(index)
 df_documents["doc_id"] = df_index.idn
-if args.max_docs > 0:
-    df_documents = df_documents.head(args.max_docs)
+
 # df_documents = df_documents.head(10)
 
 # Define the function to be executed in parallel

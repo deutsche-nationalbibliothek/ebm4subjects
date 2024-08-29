@@ -81,6 +81,27 @@ gold_standard <- gold_standard |>
   inner_join(test_corpus, by = c("idn", "kind")) |>
   rename(doc_id = idn)
 
+print(str(predicted))
+
+n_idn_indexed <- predicted |>
+  summarise(n_idn_indexed = n_distinct(doc_id)) |>
+  pull(n_idn_indexed)
+
+# print(paste("Number of documents in predicted: ", n_idn_indexed))
+n_not_indexed <- anti_join(
+  x = distinct(gold_standard, doc_id),
+  y = distinct(predicted, doc_id),
+  by = "doc_id"
+)  |> nrow()
+
+if (n_not_indexed > 0) {
+  message(
+    "There are ",
+    n_not_indexed,
+    " documents in the ground truth with no predictions."
+  )
+}
+
 predictions_at_5 <- filter(predicted, rank <= 5)
 
 # Berechne die Retrieval Metriken "at 5"

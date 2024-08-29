@@ -93,11 +93,13 @@ stages:
           --model_file results/train/model.rds
           --test_index corpora/${task.name}/${item}.arrow
           --test_candidates results/${item}/candidates.arrow
+          --max_docs ${search.max_docs}
           --label_distribution assets/gnd-label-distribution.arrow
           --top_k ${predict.top_k}
           --out_file results/${item}/predictions.arrow
       params:
         - predict.top_k
+        - search.max_docs
       deps:
         - src/predict.r
         - src/prepare_data_for_gbm.r

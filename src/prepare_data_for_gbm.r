@@ -7,6 +7,7 @@ prepare_data <- function(
   max_docs = -1
 ) {
   if (max_docs > 0) {
+    message("Using only ", max_docs, " documents.")
     index <- index  |>
       slice_head(n = max_docs)
   }
