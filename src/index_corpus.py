@@ -236,7 +236,8 @@ else:
     results = [process_batch(batch) for batch in batches]
 
 # Concatenate the results
-df_results = pd.concat([pd.concat(result) for result in results])
+inner_results_list = [pd.concat(result) for result in results if result is not None]
+df_results = pd.concat([result for result in inner_results_list if not result.empty])
 
 # Write results arrow file to 'output'
 df_results.to_feather(output)
