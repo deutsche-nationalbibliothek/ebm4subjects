@@ -39,6 +39,7 @@ stages:
           python src/index_corpus.py 
           --corpus corpora/${task.name}/${item}.tsv.gz
           --index corpora/${task.name}/${item}.arrow 
+          --max_docs ${search.max_docs}
           --pref_labels vocab/gnd_pref_labels.arrow
           --alpha ${search.alpha}
           --top_k ${search.top_k}
@@ -54,6 +55,7 @@ stages:
         - search.alpha
         - search.top_k
         - search.chunk_size
+        - search.max_docs
         # search.n_jobs doesn't need to be a dvc dependency, as it has no effect on the output
         - task.name
       outs:
@@ -65,6 +67,7 @@ stages:
       - >
         Rscript src/train.r --ground_truth corpora/ground-truth.arrow
         --train_index corpora/${task.name}/train.arrow
+        --max_docs ${search.max_docs}
         --train_candidates results/train/candidates.arrow
         --label_distribution assets/gnd-label-distribution.arrow
         --model_file results/train/model.rds

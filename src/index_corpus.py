@@ -20,6 +20,7 @@ parser = argparse.ArgumentParser(description='Process command line arguments')
 # Add arguments with default values
 parser.add_argument('--corpus', type=str, default='corpora/title/test.tsv.gz', help='Corpus to be indexed')
 parser.add_argument('--index', type=str, default='corpora/title/test.arrow', help='Index file')
+parser.add_argument('--max_docs', type=int, default=-1, help='Maximum number of documents to index')
 parser.add_argument('--alpha', type=float, default=0.0, help='Alpha value for hybrid search')
 parser.add_argument('--top_k', type=int, default=100, help='Number of top k results to keep')
 parser.add_argument('--chunk_size', type=int, default=1000, help='Chunk size')
@@ -187,6 +188,8 @@ df_documents = pd.read_csv(
 
 df_index = pd.read_feather(index)
 df_documents["doc_id"] = df_index.idn
+if args.max_docs > 0:
+    df_documents = df_documents.head(args.max_docs)
 # df_documents = df_documents.head(10)
 
 # Define the function to be executed in parallel

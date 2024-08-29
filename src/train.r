@@ -2,21 +2,6 @@
 library("optparse")
 
 option_list = list(
-  # make_option(
-  #   c("--kind"), type = "character", default = "title",
-  #   help = "title or ft",
-  #   metavar = "character"
-  # ),
-  # make_option(
-  #   c("--task"), type = "character", default = "title",
-  #   help = "name of the task e.g. ft30k or titleoa",
-  #   metavar = "character"
-  # ),
-  # make_option(
-  #   c("--evalset"), type = "character", default = "test",
-  #   help = "which split to evaluate on, e.g. test or validate",
-  #   metavar = "character"
-  # ),
   make_option(
     c("--ground_truth"),
     type = "character", default = "corpora/ground-truth.arrow",
@@ -28,6 +13,12 @@ option_list = list(
     type = "character", default = "corpora/ftoa/train.arrow",
     help = "path to the test index file",
     metavar = "character"
+  ),
+  make_option(
+    c("--max_docs"),
+    type = "integer", default = -1,
+    help = "maximum number of documents to use",
+    metavar = "integer"
   ),
   make_option(
     c("--train_candidates"),
@@ -80,7 +71,8 @@ model_data_train <- prepare_data(
   include_ground_truth = TRUE,
   ground_truth = gt,
   candidates = candidates_train,
-  label_disribution = gnd_label_disribution
+  label_disribution = gnd_label_disribution,
+  max_docs = opt$max_docs
 )
 
 # tree_model <- tree(

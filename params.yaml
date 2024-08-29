@@ -2,6 +2,7 @@ search:
   alpha: 1.0
   top_k: 100
   chunk_size: 1000
+  max_docs: 30000
   n_jobs: 40
 
 predict:

@@ -3,8 +3,14 @@ prepare_data <- function(
   candidates,
   label_disribution,
   include_ground_truth = FALSE,
-  ground_truth = NULL
+  ground_truth = NULL,
+  max_docs = -1
 ) {
+  if (max_docs > 0) {
+    index <- index  |>
+      slice_head(n = max_docs)
+  }
+
   if (include_ground_truth) {
 
     gold_standard <- index %>%

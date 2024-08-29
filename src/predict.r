@@ -22,6 +22,12 @@ option_list = list(
     metavar = "character"
   ),
   make_option(
+    c("--max_docs"),
+    type = "integer", default = -1,
+    help = "maximum number of documents to use",
+    metavar = "integer"
+  ),
+  make_option(
     c("--label_distribution"), type = "character",
     default = "assets/gnd-label-distribution.arrow",
     help = "path to the label distribution file",
@@ -72,7 +78,8 @@ model_data <- prepare_data(
   index = test_index,
   include_ground_truth = FALSE,
   candidates = test_candidates,
-  label_disribution = gnd_label_disribution
+  label_disribution = gnd_label_disribution,
+  max_docs = opt$max_docs
 )
 
 # Make predictions
