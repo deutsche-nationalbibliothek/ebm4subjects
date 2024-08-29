@@ -11,8 +11,9 @@ import multiprocessing
 from tqdm import tqdm
 import time
 import hashlib
+import nltk
 
-
+sentence_tokenizer = nltk.data.load("tokenizers/punkt/german.pickle")
 # Create argument parser
 parser = argparse.ArgumentParser(description='Process command line arguments')
 
@@ -45,7 +46,7 @@ output = args.output
 task = args.task
 evalset = args.evalset
 
-def index_chunk(text_query, doc_id, chunk_id, client, alpha, host='8090'):
+def index_chunk(text_query, doc_id, chunk_id, client, alpha, n_hits = 20, host='8090'):
     gnd_collection = client.collections.get('Gnd859k_baai_bge_m3')
     text_collection = client.collections.get(f'{task}_{evalset}_baai_bge_m3')
     embedding_response = None
@@ -91,7 +92,8 @@ def index_chunk(text_query, doc_id, chunk_id, client, alpha, host='8090'):
             properties={
                 'doc_id': doc_id,
                 'chunk_id': chunk_id,
-                'chunk_text': text_query
+                'chunk_text': text_query,
+                'chunking_config': 'sentence_tokenizer'
             },
             vector=embedding
         )
@@ -99,7 +101,7 @@ def index_chunk(text_query, doc_id, chunk_id, client, alpha, host='8090'):
     response = gnd_collection.query.hybrid(
         query=text_query,
         vector=embedding,
-        limit=100,
+        limit=n_hits,
         return_metadata=MetadataQuery(score=True),
         alpha=alpha
     )
@@ -122,27 +124,48 @@ def index_chunk(text_query, doc_id, chunk_id, client, alpha, host='8090'):
     else:
         return {}
 
-def index_text(text: str, doc_id: str, client, alpha: float, top_k: int = 100, chunk_size: int = 1000):
+def index_text(text: str, doc_id: str, client, alpha: float, top_k: int = 100, chunk_size: int = 1000, fixed_length_chunking: bool = False):
     # Split the text into chunks of 1000 characters
-    chunks = [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]
+    limit_n_chunks = 300
+    chunks = []
+    if not fixed_length_chunking:
+        try:
+            chunks = sentence_tokenizer.tokenize(text)
+            chunks = [chunk for chunk in chunks if len(chunk) >= 10]
+            n_chunks = len(chunks)
+        except Exception as e:
+            print("An error occurred during sentence tokenization:", str(e))
+            fixed_length_chunking = True
+    if n_chunks >= limit_n_chunks:
+        print("Warning: Number of chunks is greater than 300. Switching to fixed length chunking.") 
+        fixed_length_chunking = True
+    
+    if fixed_length_chunking:
+        chunks = [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]
+    candidates = pd.DataFrame(columns=['doc_id', 'label_id', 'score', 'chunk_position'])
+    chunk_position = 0
     n_chunks = len(chunks)
-    df = pd.DataFrame(columns=['doc_id', 'label_id', 'score'])
-    i = 0
     for chunk in chunks:
+        if len(chunk.split()) <= 1:
+            continue
         chunk_md5 = hashlib.md5(chunk.encode()).hexdigest()
         chunk_df = index_chunk(chunk, doc_id, chunk_md5, client, alpha)
         if not chunk_df.empty:
-            if not df.empty:
-                df = pd.concat([df, chunk_df])
+            chunk_df['chunk_position'] = chunk_position/n_chunks
+            if not candidates.empty:
+                candidates = pd.concat([candidates, chunk_df])
             else:
-                df = chunk_df
-        i += 1
+                candidates = chunk_df
+        chunk_position += 1
 
-    df = df.groupby('label_id').agg(
+    df = candidates.groupby('label_id').agg(
         score=('score', 'sum'),
-        occurrences=('doc_id', 'count')
+        occurrences=('doc_id', 'count'),
+        first_occurence=('chunk_position', 'min'),
+        last_occurence=('chunk_position', 'max'),
+        spread=('chunk_position', lambda x: x.max() - x.min())
     ).reset_index()
-    df.columns = ['label_id', 'score', 'occurrences']
+    df.columns = ['label_id', 'score', 'occurrences', 'first_occurence', 'last_occurence', 'spread']
     # normalize score by n_chunks
     df['score'] = df['score'] / n_chunks
     # add new column doc_id at as first column, filled with the constand value `doc_id` as passed to the function
@@ -175,7 +198,11 @@ def process_document(row, client):
         text_query = row.content
         doc_id = row.doc_id
     # print(f"Processing document {doc_id}")
-    return index_text(text_query, doc_id, client, alpha, top_k, chunk_size)
+    try:
+        return index_text(text_query, doc_id, client, alpha, top_k, chunk_size)
+    except Exception as e:
+        print("An error occurred in doc_id", doc_id, str(e))
+        return None
 
 # Define the function to process a batch of documents
 def process_batch(batch):
@@ -185,7 +212,6 @@ def process_batch(batch):
     print(client.is_ready())
     if not client.is_ready():
       sys.exit("Weaviate client is not ready. Exiting...")
-    print("Connected to Weaviate")
     result = []
     for row in tqdm(batch, total=len(batch)):
       result.append(process_document(row, client))
