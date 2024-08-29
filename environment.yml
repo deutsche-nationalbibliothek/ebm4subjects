@@ -15,6 +15,11 @@ dependencies:
   - nltk
   - ipykernel # for interactive work in jupyter-notebooks
   
+  # train.r
+  - r-gbm
+  - r-tree
+  - r-randomforest
+
   # compute_metrics.r
   - r-base
   - r-aeneval==0.1.14
