@@ -44,6 +44,7 @@ stages:
           --alpha ${search.alpha}
           --top_k ${search.top_k}
           --chunk_size ${search.chunk_size}
+          --max_sentences_per_doc ${search.max_sentences_per_doc}
           --out results/${item}/candidates.arrow
           --n_jobs ${search.n_jobs}
           --task ${task.name}
@@ -55,6 +56,7 @@ stages:
         - search.alpha
         - search.top_k
         - search.chunk_size
+        - search.max_sentences_per_doc
         - search.max_docs
         # search.n_jobs doesn't need to be a dvc dependency, as it has no effect on the output
         - task.name

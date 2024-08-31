@@ -24,6 +24,7 @@ parser.add_argument('--max_docs', type=int, default=-1, help='Maximum number of 
 parser.add_argument('--alpha', type=float, default=0.0, help='Alpha value for hybrid search')
 parser.add_argument('--top_k', type=int, default=100, help='Number of top k results to keep')
 parser.add_argument('--chunk_size', type=int, default=1000, help='Chunk size')
+parser.add_argument('--max_sentences_per_doc', type=int, default=500, help='Maximum number of sentences per document')
 parser.add_argument('--pref_labels', type=str, default='vocab/gnd_pref_labels.arrow', help='Data frame with preferred labels')
 parser.add_argument('--n_jobs', type=int, default=20, help='Number of parallel jobs')
 parser.add_argument('--output', type=str, default='results/test/predictions.arrow', help='Output file')
@@ -39,6 +40,7 @@ index = args.index
 alpha = args.alpha
 top_k = args.top_k
 chunk_size = args.chunk_size
+max_sentences_per_doc = args.max_sentences_per_doc
 if not FileExistsError(corpus):
     sys.exit("Corpus file does not exist. Exiting...")
 pref_labels = args.pref_labels
@@ -125,9 +127,8 @@ def index_chunk(text_query, doc_id, chunk_id, client, alpha, n_hits = 20, host='
     else:
         return {}
 
-def index_text(text: str, doc_id: str, client, alpha: float, top_k: int = 100, chunk_size: int = 1000, fixed_length_chunking: bool = False):
+def index_text(text: str, doc_id: str, client, alpha: float, top_k: int = 100, chunk_size: int = 1000, max_sentences_per_doc: int = None, fixed_length_chunking: bool = False):
     # Split the text into chunks of 1000 characters
-    limit_n_chunks = 300
     chunks = []
     if not fixed_length_chunking:
         try:
@@ -137,8 +138,8 @@ def index_text(text: str, doc_id: str, client, alpha: float, top_k: int = 100, c
         except Exception as e:
             print("An error occurred during sentence tokenization:", str(e))
             fixed_length_chunking = True
-    if n_chunks >= limit_n_chunks:
-        print("Warning: Number of chunks is greater than 300. Switching to fixed length chunking.") 
+    if n_chunks >= max_sentences_per_doc:
+        print("Warning: Number of chunks", n_chunks, "is greater than", max_sentences_per_doc, "Switching to fixed length chunking.") 
         fixed_length_chunking = True
     
     if fixed_length_chunking:
@@ -204,7 +205,7 @@ def process_document(row, client):
         doc_id = row.doc_id
     # print(f"Processing document {doc_id}")
     try:
-        return index_text(text_query, doc_id, client, alpha, top_k, chunk_size)
+        return index_text(text_query, doc_id, client, alpha, top_k, chunk_size, max_sentences_per_doc)
     except Exception as e:
         print("An error occurred in doc_id", doc_id, str(e))
         return None
@@ -214,7 +215,6 @@ def process_batch(batch):
     # batch_id = multiprocessing.current_process()._identity[0]
     # print(f"Processing batch {batch_id}")
     client = weaviate.connect_to_local()
-    print(client.is_ready())
     if not client.is_ready():
       sys.exit("Weaviate client is not ready. Exiting...")
     result = []
