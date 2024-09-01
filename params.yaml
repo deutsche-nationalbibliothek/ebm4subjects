@@ -1,6 +1,7 @@
 search:
   alpha: 0.5
   top_k: 100
+  n_hits: 20
   chunk_size: 1000
   max_docs: 30000
   max_sentences_per_doc: 500

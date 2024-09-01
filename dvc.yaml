@@ -43,6 +43,7 @@ stages:
           --pref_labels vocab/gnd_pref_labels.arrow
           --alpha ${search.alpha}
           --top_k ${search.top_k}
+          --n_hits ${search.n_hits}
           --chunk_size ${search.chunk_size}
           --max_sentences_per_doc ${search.max_sentences_per_doc}
           --out results/${item}/candidates.arrow
@@ -55,6 +56,7 @@ stages:
       params:
         - search.alpha
         - search.top_k
+        - search.n_hits
         - search.chunk_size
         - search.max_sentences_per_doc
         - search.max_docs

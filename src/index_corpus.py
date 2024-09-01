@@ -23,6 +23,7 @@ parser.add_argument('--index', type=str, default='corpora/title/test.arrow', hel
 parser.add_argument('--max_docs', type=int, default=-1, help='Maximum number of documents to index')
 parser.add_argument('--alpha', type=float, default=0.0, help='Alpha value for hybrid search')
 parser.add_argument('--top_k', type=int, default=100, help='Number of top k results to keep')
+parser.add_argument('--n_hits', type=int, default=20, help='Number of hits to retrieve from Hybrid Search')
 parser.add_argument('--chunk_size', type=int, default=1000, help='Chunk size')
 parser.add_argument('--max_sentences_per_doc', type=int, default=500, help='Maximum number of sentences per document')
 parser.add_argument('--pref_labels', type=str, default='vocab/gnd_pref_labels.arrow', help='Data frame with preferred labels')
@@ -39,6 +40,7 @@ corpus = args.corpus
 index = args.index
 alpha = args.alpha
 top_k = args.top_k
+n_hits = args.n_hits
 chunk_size = args.chunk_size
 max_sentences_per_doc = args.max_sentences_per_doc
 if not FileExistsError(corpus):
@@ -49,7 +51,7 @@ output = args.output
 task = args.task
 evalset = args.evalset
 
-def index_chunk(text_query, doc_id, chunk_id, client, alpha, n_hits = 20, host='8090'):
+def index_chunk(text_query, doc_id, chunk_id, client, alpha, n_hits = n_hits, host='8090'):
     gnd_collection = client.collections.get('Gnd859k_baai_bge_m3')
     text_collection = client.collections.get(f'{task}_{evalset}_baai_bge_m3')
     embedding_response = None
