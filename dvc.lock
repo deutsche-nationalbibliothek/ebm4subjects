@@ -21,7 +21,7 @@ stages:
     - mkdir -p results/test/
     - "python src/index_corpus.py  --corpus corpora/ft30k/test.tsv.gz --index corpora/ft30k/test.arrow\
       \  --pref_labels vocab/gnd_pref_labels.arrow --alpha 1.0 --top_k 100 --chunk_size
-      1000 --out results/test/predictions.arrow --n_jobs 40 --task ft30k --evalset
+      500 --out results/test/predictions.arrow --n_jobs 40 --task ft30k --evalset
       test\n"
     deps:
     - path: results/test/collection_name.txt
@@ -35,14 +35,14 @@ stages:
     params:
       params.yaml:
         search.alpha: 1.0
-        search.chunk_size: 1000
+        search.chunk_size: 500
         search.top_k: 100
         task.name: ft30k
     outs:
     - path: results/test/predictions.arrow
       hash: md5
-      md5: 14f407993109f38ae3aa74c635e92a0b
-      size: 23070194
+      md5: f2b85660b86a6dd9dc0d83f8683cec85
+      size: 23655034
   compute_metrics@test:
     cmd:
     - mkdir -p results/test/
@@ -59,12 +59,12 @@ stages:
       size: 55898370
     - path: results/test/predictions.arrow
       hash: md5
-      md5: 14f407993109f38ae3aa74c635e92a0b
-      size: 23070194
+      md5: 7795d8cb451486d72ba2866f162b6a92
+      size: 16372930
     - path: src/compute_metrics.r
       hash: md5
-      md5: c5c7c7c747a5ed3d819e4090882f34ed
-      size: 4699
+      md5: b71acac8045cb4abdda7f2b929bf99b1
+      size: 5177
     params:
       params.yaml:
         task.kind: ft
@@ -72,38 +72,38 @@ stages:
     outs:
     - path: results//test/prec_at_5.json
       hash: md5
-      md5: 9313208c6f685c6cf995ef85f4f0ce43
+      md5: f50c4ce55097e1e62e1a7bd26dd46550
       size: 37
     - path: results//test/rec_at_5.json
       hash: md5
-      md5: e33c6bae826602e174deaa6e9b16e2c7
+      md5: 4ba00294e8c431e9439601f4bac082c4
       size: 36
     - path: results/test/f1_at_5.json
       hash: md5
-      md5: 5834a57babb9496f6ec67631e1627e3f
+      md5: f85191a7d4e8a80acd86085d93e644d7
       size: 35
     - path: results/test/pr_auc.json
       hash: md5
-      md5: 93e19746e51f805e949f7de22c396094
-      size: 29
+      md5: 1b4791fda14a8e74241d4ded2891bc5b
+      size: 27
     - path: results/test/pr_curve.csv
       hash: md5
-      md5: c53b48c1ced8dda8ab0c86ac1f64eb8e
-      size: 4054
+      md5: c9ac304eb33e920f988e23ca8e9779fc
+      size: 3709
     - path: results/test/pr_curve_plot.svg
       hash: md5
-      md5: bf1e77f8988471293cd3d918a3e26267
-      size: 17257
+      md5: bcb20ce90f6206c80b0e68bd3e94620a
+      size: 17798
     - path: results/test/rprec_at_5.json
       hash: md5
-      md5: e8a5e078188b2187090d1e5b12d757d8
+      md5: a3a87d06b61d0b4ef094447396928a95
       size: 38
   index_corpus@validate:
     cmd:
     - mkdir -p results/validate/
     - "python src/index_corpus.py  --corpus corpora/ft30k/validate.tsv.gz --index
       corpora/ft30k/validate.arrow  --pref_labels vocab/gnd_pref_labels.arrow --alpha
-      1.0 --top_k 100 --chunk_size 1000 --out results/validate/predictions.arrow --n_jobs
+      1.0 --top_k 100 --chunk_size 500 --out results/validate/predictions.arrow --n_jobs
       40 --task ft30k --evalset validate\n"
     deps:
     - path: results/validate/collection_name.txt
@@ -117,14 +117,14 @@ stages:
     params:
       params.yaml:
         search.alpha: 1.0
-        search.chunk_size: 1000
+        search.chunk_size: 500
         search.top_k: 100
         task.name: ft30k
     outs:
     - path: results/validate/predictions.arrow
       hash: md5
-      md5: 051b23287702b6bea44b49b4cceaa8b4
-      size: 66208914
+      md5: f5161c3b13b4797a9f69c271513913fb
+      size: 68127674
   compute_metrics@validate:
     cmd:
     - mkdir -p results/validate/
@@ -142,12 +142,12 @@ stages:
       size: 55898370
     - path: results/validate/predictions.arrow
       hash: md5
-      md5: 051b23287702b6bea44b49b4cceaa8b4
-      size: 66208914
+      md5: de8cf2e43b759d399419261d68f08edb
+      size: 46660562
     - path: src/compute_metrics.r
       hash: md5
-      md5: c5c7c7c747a5ed3d819e4090882f34ed
-      size: 4699
+      md5: b71acac8045cb4abdda7f2b929bf99b1
+      size: 5177
     params:
       params.yaml:
         task.kind: ft
@@ -155,40 +155,42 @@ stages:
     outs:
     - path: results//validate/prec_at_5.json
       hash: md5
-      md5: 63efe7c6e1ffb3a3bbaefaef8069f566
-      size: 36
+      md5: e2ae33d54d480440aa0b0695c783de94
+      size: 37
     - path: results//validate/rec_at_5.json
       hash: md5
-      md5: e0795f0ccd1d78991fb57d6946280d44
+      md5: e129669d552bf1d003dda3e8941324d7
       size: 36
     - path: results/validate/f1_at_5.json
       hash: md5
-      md5: 73c7c9677848f2774e6d7b7df5a9a236
+      md5: 102884892c286c439303561177cc1e45
       size: 35
     - path: results/validate/pr_auc.json
       hash: md5
-      md5: 4319c11d3a65a257fc421e6d8807515a
+      md5: 412c2bd96167062b8c0a858fb55abe25
       size: 29
     - path: results/validate/pr_curve.csv
       hash: md5
-      md5: 6a7086a948cee14c20f5ef9c95e7ec17
-      size: 4053
+      md5: edc2ad37a4a2e6dea9d44f23605bcf21
+      size: 3874
     - path: results/validate/pr_curve_plot.svg
       hash: md5
-      md5: 3d804932555215c70f537ddb22db3eea
-      size: 16840
+      md5: 4f2cba77b52fa15b0f406e84f7fca7a7
+      size: 17766
     - path: results/validate/rprec_at_5.json
       hash: md5
-      md5: 2a8da50bbde812671b14b1147fe1ad7b
+      md5: 4840468685d337346c40a3161e12a397
       size: 38
   create_collection@test:
-    cmd: python src/create_collection.py --task ft30k --evalset test --collection_name_file
-      results/test/collection_name.txt
+    cmd:
+    - mkdir -p results/test/
+    - python src/create_collection.py --task ft30k --evalset test --collection_name_file
+      results/test/collection_name.txt --overwrite false
     deps:
     - path: src/create_collection.py
       hash: md5
-      md5: 867f3ca52186b031b5e1984ae21ef117
-      size: 3030
+      md5: d560ab5d62f6b276cbb955df6bc2c548
+      size: 3389
     params:
       params.yaml:
         collection.overwrite: false
@@ -199,13 +201,15 @@ stages:
       md5: 56e2c40b7e81c2bab863e6ac0c9953fe
       size: 22
   create_collection@validate:
-    cmd: python src/create_collection.py --task ft30k --evalset validate --collection_name_file
-      results/validate/collection_name.txt
+    cmd:
+    - mkdir -p results/validate/
+    - python src/create_collection.py --task ft30k --evalset validate --collection_name_file
+      results/validate/collection_name.txt --overwrite false
     deps:
     - path: src/create_collection.py
       hash: md5
-      md5: 867f3ca52186b031b5e1984ae21ef117
-      size: 3030
+      md5: d560ab5d62f6b276cbb955df6bc2c548
+      size: 3389
     params:
       params.yaml:
         collection.overwrite: false
@@ -215,3 +219,225 @@ stages:
       hash: md5
       md5: fece339858b5c76ea4a036677099c3aa
       size: 26
+  create_collection@train:
+    cmd:
+    - mkdir -p results/train/
+    - python src/create_collection.py --task ft30k --evalset train --collection_name_file
+      results/train/collection_name.txt --overwrite false
+    deps:
+    - path: src/create_collection.py
+      hash: md5
+      md5: d560ab5d62f6b276cbb955df6bc2c548
+      size: 3389
+    params:
+      params.yaml:
+        collection.overwrite: false
+        task.name: ft30k
+    outs:
+    - path: results/train/collection_name.txt
+      hash: md5
+      md5: 98a683578d4202827f9b528be30bdaa1
+      size: 23
+  index_candidates@train:
+    cmd:
+    - mkdir -p results/train/
+    - "python src/index_corpus.py  --corpus corpora/ft30k/train.tsv.gz --index corpora/ft30k/train.arrow\
+      \  --max_docs 30000 --pref_labels vocab/gnd_pref_labels.arrow --alpha 0.5 --top_k
+      100 --chunk_size 1000 --max_sentences_per_doc 500 --out results/train/candidates.arrow
+      --n_jobs 40 --task ft30k --evalset train\n"
+    deps:
+    - path: results/train/collection_name.txt
+      hash: md5
+      md5: 98a683578d4202827f9b528be30bdaa1
+      size: 23
+    - path: src/index_corpus.py
+      hash: md5
+      md5: 70df9ce43beeb3f4cf9cafa200f19621
+      size: 9179
+    params:
+      params.yaml:
+        search.alpha: 0.5
+        search.chunk_size: 1000
+        search.max_docs: 30000
+        search.max_sentences_per_doc: 500
+        search.top_k: 100
+        task.name: ft30k
+    outs:
+    - path: results/train/candidates.arrow
+      hash: md5
+      md5: 7d6c110230afc704092e094ff983758f
+      size: 123436226
+  index_candidates@validate:
+    cmd:
+    - mkdir -p results/validate/
+    - "python src/index_corpus.py  --corpus corpora/ft30k/validate.tsv.gz --index
+      corpora/ft30k/validate.arrow  --max_docs 30000 --pref_labels vocab/gnd_pref_labels.arrow
+      --alpha 0.5 --top_k 100 --chunk_size 1000 --max_sentences_per_doc 500 --out
+      results/validate/candidates.arrow --n_jobs 40 --task ft30k --evalset validate\n"
+    deps:
+    - path: results/validate/collection_name.txt
+      hash: md5
+      md5: fece339858b5c76ea4a036677099c3aa
+      size: 26
+    - path: src/index_corpus.py
+      hash: md5
+      md5: 70df9ce43beeb3f4cf9cafa200f19621
+      size: 9179
+    params:
+      params.yaml:
+        search.alpha: 0.5
+        search.chunk_size: 1000
+        search.max_docs: 30000
+        search.max_sentences_per_doc: 500
+        search.top_k: 100
+        task.name: ft30k
+    outs:
+    - path: results/validate/candidates.arrow
+      hash: md5
+      md5: 73884f37db1c78390f694525be6ec9ba
+      size: 99484202
+  index_candidates@test:
+    cmd:
+    - mkdir -p results/test/
+    - "python src/index_corpus.py  --corpus corpora/ft30k/test.tsv.gz --index corpora/ft30k/test.arrow\
+      \  --max_docs 30000 --pref_labels vocab/gnd_pref_labels.arrow --alpha 0.5 --top_k
+      100 --chunk_size 1000 --max_sentences_per_doc 500 --out results/test/candidates.arrow
+      --n_jobs 40 --task ft30k --evalset test\n"
+    deps:
+    - path: results/test/collection_name.txt
+      hash: md5
+      md5: 56e2c40b7e81c2bab863e6ac0c9953fe
+      size: 22
+    - path: src/index_corpus.py
+      hash: md5
+      md5: 70df9ce43beeb3f4cf9cafa200f19621
+      size: 9179
+    params:
+      params.yaml:
+        search.alpha: 0.5
+        search.chunk_size: 1000
+        search.max_docs: 30000
+        search.max_sentences_per_doc: 500
+        search.top_k: 100
+        task.name: ft30k
+    outs:
+    - path: results/test/candidates.arrow
+      hash: md5
+      md5: c74e60d6831c152c0f0917ed954fd470
+      size: 34499874
+  train:
+    cmd:
+    - mkdir -p results/train/
+    - "Rscript src/train.r --ground_truth corpora/ground-truth.arrow --train_index
+      corpora/ft30k/train.arrow --max_docs 30000 --train_candidates results/train/candidates.arrow
+      --label_distribution assets/gnd-label-distribution.arrow --model_file results/train/model.rds\n"
+    deps:
+    - path: assets/gnd-label-distribution.arrow
+      hash: md5
+      md5: cf88a4cfcc09c976d6ca2dc193ae9efc
+      size: 2316610
+    - path: corpora/ft30k/train.arrow
+      hash: md5
+      md5: 87503a6b6b607989e96191f7356f2955
+      size: 3512866
+    - path: corpora/ground-truth.arrow
+      hash: md5
+      md5: 717791c69fedc7d364b38fdaf99fbce5
+      size: 55898370
+    - path: results/train/candidates.arrow
+      hash: md5
+      md5: 7d6c110230afc704092e094ff983758f
+      size: 123436226
+    - path: src/prepare_data_for_gbm.r
+      hash: md5
+      md5: 7abc5cc269e32755bac3bbd36f7c3413
+      size: 1863
+    - path: src/train.r
+      hash: md5
+      md5: 0e6fd66a6a0421fdd12ec73f18f40ecb
+      size: 2661
+    outs:
+    - path: results/train/model.rds
+      hash: md5
+      md5: a8e9910e821d00b892a446f012d800f0
+      size: 130378080
+  predict@validate:
+    cmd:
+    - mkdir -p results/validate/
+    - "Rscript src/predict.r  --model_file results/train/model.rds --test_index corpora/ft30k/validate.arrow
+      --test_candidates results/validate/candidates.arrow --max_docs 30000 --label_distribution
+      assets/gnd-label-distribution.arrow --top_k 100 --out_file results/validate/predictions.arrow\n"
+    deps:
+    - path: assets/gnd-label-distribution.arrow
+      hash: md5
+      md5: cf88a4cfcc09c976d6ca2dc193ae9efc
+      size: 2316610
+    - path: corpora/ft30k/validate.arrow
+      hash: md5
+      md5: daf4fa7e3980b413a777a5aac7aa7cbf
+      size: 531274
+    - path: results/train/model.rds
+      hash: md5
+      md5: a8e9910e821d00b892a446f012d800f0
+      size: 130378080
+    - path: results/validate/candidates.arrow
+      hash: md5
+      md5: 73884f37db1c78390f694525be6ec9ba
+      size: 99484202
+    - path: src/predict.r
+      hash: md5
+      md5: e918073012f4e3e54315c91c68a61ee2
+      size: 2555
+    - path: src/prepare_data_for_gbm.r
+      hash: md5
+      md5: 7abc5cc269e32755bac3bbd36f7c3413
+      size: 1863
+    params:
+      params.yaml:
+        predict.top_k: 100
+        search.max_docs: 30000
+    outs:
+    - path: results/validate/predictions.arrow
+      hash: md5
+      md5: de8cf2e43b759d399419261d68f08edb
+      size: 46660562
+  predict@test:
+    cmd:
+    - mkdir -p results/test/
+    - "Rscript src/predict.r  --model_file results/train/model.rds --test_index corpora/ft30k/test.arrow
+      --test_candidates results/test/candidates.arrow --max_docs 30000 --label_distribution
+      assets/gnd-label-distribution.arrow --top_k 100 --out_file results/test/predictions.arrow\n"
+    deps:
+    - path: assets/gnd-label-distribution.arrow
+      hash: md5
+      md5: cf88a4cfcc09c976d6ca2dc193ae9efc
+      size: 2316610
+    - path: corpora/ft30k/test.arrow
+      hash: md5
+      md5: 92b20edbbd46039c16bd5008b568bc89
+      size: 187122
+    - path: results/test/candidates.arrow
+      hash: md5
+      md5: c74e60d6831c152c0f0917ed954fd470
+      size: 34499874
+    - path: results/train/model.rds
+      hash: md5
+      md5: a8e9910e821d00b892a446f012d800f0
+      size: 130378080
+    - path: src/predict.r
+      hash: md5
+      md5: e918073012f4e3e54315c91c68a61ee2
+      size: 2555
+    - path: src/prepare_data_for_gbm.r
+      hash: md5
+      md5: 7abc5cc269e32755bac3bbd36f7c3413
+      size: 1863
+    params:
+      params.yaml:
+        predict.top_k: 100
+        search.max_docs: 30000
+    outs:
+    - path: results/test/predictions.arrow
+      hash: md5
+      md5: 7795d8cb451486d72ba2866f162b6a92
+      size: 16372930
