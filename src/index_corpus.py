@@ -26,6 +26,7 @@ parser.add_argument('--top_k', type=int, default=100, help='Number of top k resu
 parser.add_argument('--n_hits', type=int, default=20, help='Number of hits to retrieve from Hybrid Search')
 parser.add_argument('--chunk_size', type=int, default=1000, help='Chunk size')
 parser.add_argument('--max_sentences_per_doc', type=int, default=500, help='Maximum number of sentences per document')
+parser.add_argument('--fixed_length_chunking', type=bool, default=False, help='Use fixed length chunking')
 parser.add_argument('--pref_labels', type=str, default='vocab/gnd_pref_labels.arrow', help='Data frame with preferred labels')
 parser.add_argument('--n_jobs', type=int, default=20, help='Number of parallel jobs')
 parser.add_argument('--output', type=str, default='results/test/predictions.arrow', help='Output file')
@@ -43,6 +44,7 @@ top_k = args.top_k
 n_hits = args.n_hits
 chunk_size = args.chunk_size
 max_sentences_per_doc = args.max_sentences_per_doc
+fixed_length_chunking = args.fixed_length_chunking
 if not FileExistsError(corpus):
     sys.exit("Corpus file does not exist. Exiting...")
 pref_labels = args.pref_labels
@@ -207,7 +209,7 @@ def process_document(row, client):
         doc_id = row.doc_id
     # print(f"Processing document {doc_id}")
     try:
-        return index_text(text_query, doc_id, client, alpha, top_k, chunk_size, max_sentences_per_doc)
+        return index_text(text_query, doc_id, client, alpha, top_k, chunk_size, max_sentences_per_doc, fixed_length_chunking)
     except Exception as e:
         print("An error occurred in doc_id", doc_id, str(e))
         return None

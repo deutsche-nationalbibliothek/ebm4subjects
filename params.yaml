@@ -5,6 +5,7 @@ search:
   chunk_size: 1000
   max_docs: 30000
   max_sentences_per_doc: 500
+  fixed_length_chunking: false
   n_jobs: 40
 
 predict:

@@ -46,6 +46,7 @@ stages:
           --n_hits ${search.n_hits}
           --chunk_size ${search.chunk_size}
           --max_sentences_per_doc ${search.max_sentences_per_doc}
+          --fixed_length_chunking ${search.fixed_length_chunking}
           --out results/${item}/candidates.arrow
           --n_jobs ${search.n_jobs}
           --task ${task.name}
@@ -60,6 +61,7 @@ stages:
         - search.chunk_size
         - search.max_sentences_per_doc
         - search.max_docs
+        - search.fixed_length_chunking
         # search.n_jobs doesn't need to be a dvc dependency, as it has no effect on the output
         - task.name
       outs:
