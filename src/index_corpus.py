@@ -53,7 +53,7 @@ output = args.output
 task = args.task
 evalset = args.evalset
 
-def index_chunk(text_query, doc_id, chunk_id, client, alpha, n_hits = n_hits, host='8090'):
+def index_chunk(text_query, doc_id, chunk_id, client, alpha, chunking_config, n_hits = n_hits, host='8090'):
     gnd_collection = client.collections.get('Gnd859k_baai_bge_m3')
     text_collection = client.collections.get(f'{task}_{evalset}_baai_bge_m3')
     embedding_response = None
@@ -100,7 +100,7 @@ def index_chunk(text_query, doc_id, chunk_id, client, alpha, n_hits = n_hits, ho
                 'doc_id': doc_id,
                 'chunk_id': chunk_id,
                 'chunk_text': text_query,
-                'chunking_config': 'sentence_tokenizer'
+                'chunking_config': chunking_config
             },
             vector=embedding
         )
@@ -142,20 +142,22 @@ def index_text(text: str, doc_id: str, client, alpha: float, top_k: int = 100, c
         except Exception as e:
             print("An error occurred during sentence tokenization:", str(e))
             fixed_length_chunking = True
-    if n_chunks >= max_sentences_per_doc:
-        print("Warning: Number of chunks", n_chunks, "is greater than", max_sentences_per_doc, "Switching to fixed length chunking.") 
-        fixed_length_chunking = True
+        if n_chunks >= max_sentences_per_doc:
+            print("Warning: Number of chunks", n_chunks, "is greater than", max_sentences_per_doc, "Switching to fixed length chunking.") 
+            fixed_length_chunking = True
     
     if fixed_length_chunking:
+        chunk_size = max(chunk_size, len(text))
         chunks = [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]
     candidates = pd.DataFrame(columns=['doc_id', 'label_id', 'score', 'chunk_position'])
     chunk_position = 0
     n_chunks = len(chunks)
     for chunk in chunks:
+        chunking_config = f'fixed_length_chunking_{chunk_size}' if fixed_length_chunking else 'sentence_tokenization_{max_sentences_per_doc}'
         if len(chunk.split()) <= 1:
             continue
         chunk_md5 = hashlib.md5(chunk.encode()).hexdigest()
-        chunk_df = index_chunk(chunk, doc_id, chunk_md5, client, alpha)
+        chunk_df = index_chunk(chunk, doc_id, chunk_md5, client, alpha, chunking_config)
         if not chunk_df.empty:
             chunk_df['chunk_position'] = chunk_position/n_chunks
             if not candidates.empty:
