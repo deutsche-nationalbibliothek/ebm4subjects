@@ -81,8 +81,6 @@ gold_standard <- gold_standard |>
   inner_join(test_corpus, by = c("idn", "kind")) |>
   rename(doc_id = idn)
 
-print(str(predicted))
-
 n_idn_indexed <- predicted |>
   summarise(n_idn_indexed = n_distinct(doc_id)) |>
   pull(n_idn_indexed)
