@@ -243,8 +243,9 @@ stages:
     - mkdir -p results/train/
     - "python src/index_corpus.py  --corpus corpora/ft30k/train.tsv.gz --index corpora/ft30k/train.arrow\
       \  --max_docs 30000 --pref_labels vocab/gnd_pref_labels.arrow --alpha 0.625
-      --top_k 100 --n_hits 20 --chunk_size 1000 --max_sentences_per_doc 500 --out
-      results/train/candidates.arrow --n_jobs 40 --task ft30k --evalset train\n"
+      --top_k 100 --n_hits 20 --chunk_size 1000 --max_sentences_per_doc 500 --fixed_length_chunking
+      false --out results/train/candidates.arrow --n_jobs 40 --task ft30k --evalset
+      train\n"
     deps:
     - path: results/train/collection_name.txt
       hash: md5
@@ -252,12 +253,13 @@ stages:
       size: 23
     - path: src/index_corpus.py
       hash: md5
-      md5: 6f56b93d815cdc3ca2624ed9ec5487f0
-      size: 9312
+      md5: f1b89569d0f87fa040601555ac7425e7
+      size: 10052
     params:
       params.yaml:
         search.alpha: 0.625
         search.chunk_size: 1000
+        search.fixed_length_chunking: false
         search.max_docs: 30000
         search.max_sentences_per_doc: 500
         search.n_hits: 20
@@ -274,8 +276,8 @@ stages:
     - "python src/index_corpus.py  --corpus corpora/ft30k/validate.tsv.gz --index
       corpora/ft30k/validate.arrow  --max_docs 30000 --pref_labels vocab/gnd_pref_labels.arrow
       --alpha 0.625 --top_k 100 --n_hits 20 --chunk_size 1000 --max_sentences_per_doc
-      500 --out results/validate/candidates.arrow --n_jobs 40 --task ft30k --evalset
-      validate\n"
+      500 --fixed_length_chunking false --out results/validate/candidates.arrow --n_jobs
+      40 --task ft30k --evalset validate\n"
     deps:
     - path: results/validate/collection_name.txt
       hash: md5
@@ -283,12 +285,13 @@ stages:
       size: 26
     - path: src/index_corpus.py
       hash: md5
-      md5: 6f56b93d815cdc3ca2624ed9ec5487f0
-      size: 9312
+      md5: f1b89569d0f87fa040601555ac7425e7
+      size: 10052
     params:
       params.yaml:
         search.alpha: 0.625
         search.chunk_size: 1000
+        search.fixed_length_chunking: false
         search.max_docs: 30000
         search.max_sentences_per_doc: 500
         search.n_hits: 20
@@ -304,8 +307,9 @@ stages:
     - mkdir -p results/test/
     - "python src/index_corpus.py  --corpus corpora/ft30k/test.tsv.gz --index corpora/ft30k/test.arrow\
       \  --max_docs 30000 --pref_labels vocab/gnd_pref_labels.arrow --alpha 0.625
-      --top_k 100 --n_hits 20 --chunk_size 1000 --max_sentences_per_doc 500 --out
-      results/test/candidates.arrow --n_jobs 40 --task ft30k --evalset test\n"
+      --top_k 100 --n_hits 20 --chunk_size 1000 --max_sentences_per_doc 500 --fixed_length_chunking
+      false --out results/test/candidates.arrow --n_jobs 40 --task ft30k --evalset
+      test\n"
     deps:
     - path: results/test/collection_name.txt
       hash: md5
@@ -313,12 +317,13 @@ stages:
       size: 22
     - path: src/index_corpus.py
       hash: md5
-      md5: 6f56b93d815cdc3ca2624ed9ec5487f0
-      size: 9312
+      md5: f1b89569d0f87fa040601555ac7425e7
+      size: 10052
     params:
       params.yaml:
         search.alpha: 0.625
         search.chunk_size: 1000
+        search.fixed_length_chunking: false
         search.max_docs: 30000
         search.max_sentences_per_doc: 500
         search.n_hits: 20
