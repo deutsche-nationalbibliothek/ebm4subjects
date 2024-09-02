@@ -61,7 +61,8 @@ def index_chunk(text_query, doc_id, chunk_id, client, alpha, chunking_config, n_
     text_collection_response = text_collection.query.fetch_objects(
         filters=(
             Filter.by_property('doc_id').equal(doc_id) & 
-            Filter.by_property('chunk_id').equal(chunk_id)
+            Filter.by_property('chunk_id').equal(chunk_id) &
+            Filter.by_property('chunking_config').equal(chunking_config)
         ),
         limit=1,
         include_vector = True
@@ -217,15 +218,16 @@ def process_document(row, client):
         return None
 
 # Define the function to process a batch of documents
-def process_batch(batch):
+def process_batch(batch, position):
     # batch_id = multiprocessing.current_process()._identity[0]
     # print(f"Processing batch {batch_id}")
     client = weaviate.connect_to_local()
     if not client.is_ready():
       sys.exit("Weaviate client is not ready. Exiting...")
     result = []
-    for row in tqdm(batch, total=len(batch)):
-      result.append(process_document(row, client))
+    for row in (pbar := tqdm(batch, total=len(batch), position=position, leave=True)):
+        pbar.set_description(f"{position:02}")
+        result.append(process_document(row, client))
     client.close()
     return result
 
@@ -233,13 +235,16 @@ def process_batch(batch):
 batch_size = len(df_documents) // n_jobs
 batches = [df_documents.iloc[i:i + batch_size].to_dict(orient='records') for i in range(0, len(df_documents), batch_size)]
 
+# Create a list of (batch, position) tuples
+batches_with_positions = [(batch, i) for i, batch in enumerate(batches)]
+
 # Apply the function to each batch in parallel
 parallel = True
 if parallel:
     with multiprocessing.Pool(processes=n_jobs) as pool:
-        results = pool.map(process_batch, batches)
+        results = pool.starmap(process_batch, batches_with_positions)
 else:
-    results = [process_batch(batch) for batch in batches]
+    results = [process_batch(batch,i) for i, batch in enumerate(batches)]
 
 # Concatenate the results
 inner_results_list = [pd.concat(result) for result in results if result is not None]
