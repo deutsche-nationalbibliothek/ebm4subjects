@@ -1,5 +1,5 @@
 search:
-  alpha: 0.5
+  alpha: 0.625
   top_k: 100
   n_hits: 20
   chunk_size: 1000
