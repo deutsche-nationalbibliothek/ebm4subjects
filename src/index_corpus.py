@@ -17,6 +17,17 @@ sentence_tokenizer = nltk.data.load("tokenizers/punkt/german.pickle")
 # Create argument parser
 parser = argparse.ArgumentParser(description='Process command line arguments')
 
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
 # Add arguments with default values
 parser.add_argument('--corpus', type=str, default='corpora/title/test.tsv.gz', help='Corpus to be indexed')
 parser.add_argument('--index', type=str, default='corpora/title/test.arrow', help='Index file')
@@ -26,7 +37,7 @@ parser.add_argument('--top_k', type=int, default=100, help='Number of top k resu
 parser.add_argument('--n_hits', type=int, default=20, help='Number of hits to retrieve from Hybrid Search')
 parser.add_argument('--chunk_size', type=int, default=1000, help='Chunk size')
 parser.add_argument('--max_sentences_per_doc', type=int, default=500, help='Maximum number of sentences per document')
-parser.add_argument('--fixed_length_chunking', type=bool, default=False, help='Use fixed length chunking')
+parser.add_argument('--fixed_length_chunking', type=str2bool, nargs='?', const=True, default=False, help='Use fixed length chunking')
 parser.add_argument('--pref_labels', type=str, default='vocab/gnd_pref_labels.arrow', help='Data frame with preferred labels')
 parser.add_argument('--n_jobs', type=int, default=20, help='Number of parallel jobs')
 parser.add_argument('--output', type=str, default='results/test/predictions.arrow', help='Output file')
@@ -143,13 +154,19 @@ def index_text(text: str, doc_id: str, client, alpha: float, top_k: int = 100, c
         except Exception as e:
             print("An error occurred during sentence tokenization:", str(e))
             fixed_length_chunking = True
-        if n_chunks >= max_sentences_per_doc:
-            print("Warning: Number of chunks", n_chunks, "is greater than", max_sentences_per_doc, "Switching to fixed length chunking.") 
+        if n_chunks >= 1500:
+            # print("Warning: Number of chunks", n_chunks, "is greater than 1500\n")
+            # print("Restricting to fixed length chunking.\n")
             fixed_length_chunking = True
+        elif n_chunks >= max_sentences_per_doc:
+            # print("Warning: Number of chunks", n_chunks, "is greater than", max_sentences_per_doc, "\n") 
+            # print("Restricting to", max_sentences_per_doc, "sentences.\n")
+            chunks = chunks[:max_sentences_per_doc]
     
     if fixed_length_chunking:
         local_chunk_size = min(chunk_size, len(text))
         chunks = [text[i:i + local_chunk_size] for i in range(0, len(text), local_chunk_size)]
+        chunks = chunks[:max_sentences_per_doc]
     candidates = pd.DataFrame(columns=['doc_id', 'label_id', 'score', 'chunk_position'])
     chunk_position = 0
     n_chunks = len(chunks)
