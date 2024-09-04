@@ -33,6 +33,30 @@ option_list = list(
     metavar = "character"
   ),
   make_option(
+    c("--n_trees"),
+    type = "integer", default = 100,
+    help = "number of trees in the GBM model",
+    metavar = "integer"
+  ),
+  make_option(
+    c("--interaction_depth"),
+    type = "integer", default = 4,
+    help = "maximum depth of interaction in the GBM model",
+    metavar = "integer"
+  ),
+  make_option(
+    c("--shrinkage"),
+    type = "numeric", default = 0.2,
+    help = "shrinkage parameter for the GBM model",
+    metavar = "numeric"
+  ),
+  make_option(
+    c("--verbose"),
+    type = "logical", default = FALSE,
+    help = "whether to print verbose output during training",
+    metavar = "logical"
+  ),
+  make_option(
     c("--model_file"),
     type = "character", default = "results/train/model.rds",
     help = "path to the output file",
@@ -79,15 +103,18 @@ model_data_train <- prepare_data(
 
 # plot(tree_model)
 # text(tree_model, pretty = 0)
-message("training model...")
+message("training model with parameters:\n n_trees = ", opt$n_trees,
+        ",\n interaction_depth = ", opt$interaction_depth,
+        ",\n shrinkage = ", opt$shrinkage,
+        ",\n verbose = ", opt$verbose)
 bst <- gbm(
   gold ~ .,
   data = model_data_train,
   distribution = "bernoulli",
-  n.trees = 100,
-  interaction.depth = 4,
-  shrinkage = 0.2,
-  verbose = TRUE
+  n.trees = opt$n_trees,
+  interaction.depth = opt$interaction_depth,
+  shrinkage = opt$shrinkage,
+  verbose = opt$verbose
 )
 
 message("saving model...")

@@ -13,7 +13,7 @@ stages:
       - validate
       - test
     do:
-      always_changed: true
+      always_changed: false
       cmd:
         - mkdir -p results/${item}/ 
         - python src/create_collection.py --task ${task.name} --evalset ${item} --collection_name_file results/${item}/collection_name.txt --overwrite ${collection.overwrite}
@@ -77,6 +77,14 @@ stages:
         --train_candidates results/train/candidates.arrow
         --label_distribution assets/gnd-label-distribution.arrow
         --model_file results/train/model.rds
+        --n_trees ${train.gbm.n_trees}
+        --interaction_depth ${train.gbm.interaction_depth}
+        --shrinkage ${train.gbm.shrinkage}
+        --verbose ${train.gbm.verbose}
+    params:
+      - train.gbm.n_trees
+      - train.gbm.interaction_depth
+      - train.gbm.shrinkage
     deps:
       - src/train.r
       - src/prepare_data_for_gbm.r

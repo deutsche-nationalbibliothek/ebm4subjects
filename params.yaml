@@ -8,6 +8,13 @@ search:
   fixed_length_chunking: false
   n_jobs: 40
 
+train:
+  gbm:
+    n_trees: 500
+    interaction_depth: 10 
+    shrinkage: 0.1
+    verbose: TRUE
+
 predict:
   top_k: 100
 
