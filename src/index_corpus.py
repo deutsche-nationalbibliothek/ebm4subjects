@@ -148,8 +148,8 @@ def index_text(text: str, doc_id: str, client, alpha: float, top_k: int = 100, c
             fixed_length_chunking = True
     
     if fixed_length_chunking:
-        chunk_size = max(chunk_size, len(text))
-        chunks = [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]
+        local_chunk_size = min(chunk_size, len(text))
+        chunks = [text[i:i + local_chunk_size] for i in range(0, len(text), local_chunk_size)]
     candidates = pd.DataFrame(columns=['doc_id', 'label_id', 'score', 'chunk_position'])
     chunk_position = 0
     n_chunks = len(chunks)
