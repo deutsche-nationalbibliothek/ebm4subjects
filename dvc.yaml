@@ -54,6 +54,8 @@ stages:
       deps:
         - src/index_corpus.py
         - results/${item}/collection_name.txt
+        - corpora/${task.name}/${item}.tsv.gz
+        - corpora/${task.name}/${item}.arrow
       params:
         - search.alpha
         - search.top_k

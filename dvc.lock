@@ -247,6 +247,14 @@ stages:
       false --out results/train/candidates.arrow --n_jobs 40 --task ft30k --evalset
       train\n"
     deps:
+    - path: corpora/ft30k/train.arrow
+      hash: md5
+      md5: 87503a6b6b607989e96191f7356f2955
+      size: 3512866
+    - path: corpora/ft30k/train.tsv.gz
+      hash: md5
+      md5: 96a705f41f1c8e04ad1cb490351e5ecb
+      size: 1687280336
     - path: results/train/collection_name.txt
       hash: md5
       md5: 98a683578d4202827f9b528be30bdaa1
@@ -279,6 +287,14 @@ stages:
       500 --fixed_length_chunking false --out results/validate/candidates.arrow --n_jobs
       40 --task ft30k --evalset validate\n"
     deps:
+    - path: corpora/ft30k/validate.arrow
+      hash: md5
+      md5: daf4fa7e3980b413a777a5aac7aa7cbf
+      size: 531274
+    - path: corpora/ft30k/validate.tsv.gz
+      hash: md5
+      md5: 22cde427d78e726c986e3a43ae7629a8
+      size: 240694251
     - path: results/validate/collection_name.txt
       hash: md5
       md5: fece339858b5c76ea4a036677099c3aa
@@ -311,6 +327,14 @@ stages:
       false --out results/test/candidates.arrow --n_jobs 40 --task ft30k --evalset
       test\n"
     deps:
+    - path: corpora/ft30k/test.arrow
+      hash: md5
+      md5: 92b20edbbd46039c16bd5008b568bc89
+      size: 187122
+    - path: corpora/ft30k/test.tsv.gz
+      hash: md5
+      md5: d75bfd97f55f0ba71e09ca5c86a1f346
+      size: 83457610
     - path: results/test/collection_name.txt
       hash: md5
       md5: 56e2c40b7e81c2bab863e6ac0c9953fe
