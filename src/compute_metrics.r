@@ -30,6 +30,13 @@ option_list = list(
     metavar = "character"
   ),
   make_option(
+    c("--label_distribution"),
+    type = "character",
+    default = "asssets/gnd_label_distribution.arrow",
+    help = "path to the label distribution file",
+    metavar = "character"
+  ),
+  make_option(
     c("--predictions_file"),
     type = "character", default = "results/validate/predictions.arrow",
     help = "path to the predictions file",
@@ -76,6 +83,7 @@ gold_standard <- arrow::read_feather(opt$ground_truth) |>
 
 test_corpus <- read_feather(opt$test_index)
 
+# label_distribution <- read_feather(opt$label_distribution)
 # Schränke Gold-Standard auf gleiche Dokumenten-Menge ein, wie predicted
 gold_standard <- gold_standard |>
   inner_join(test_corpus, by = c("idn", "kind")) |>

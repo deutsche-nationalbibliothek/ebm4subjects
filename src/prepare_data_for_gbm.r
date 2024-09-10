@@ -1,3 +1,7 @@
+require(dplyr)
+require(stringr)
+require(aeneval)
+
 prepare_data <- function(
   index,
   candidates,
@@ -15,7 +19,7 @@ prepare_data <- function(
   if (include_ground_truth) {
 
     gold_standard <- index %>%
-      left_join(gt, by = c("idn", "kind"))  |>
+      inner_join(gt, by = c("idn", "kind"), na_matches = "never")  |>
       mutate(
         doc_id = idn,
         label_id = str_match(uri, "(?<idn>[0-9X]{9,10})")[, "idn"]
@@ -39,7 +43,7 @@ prepare_data <- function(
       gold_standard,
       candidates
     )  |>
-      left_join(label_disribution, by = "label_id")
+      left_join(label_disribution, by = "label_id", na_matches = "never")
 
     res <- res  |>
       filter(suggested)  |>
@@ -71,8 +75,8 @@ prepare_data <- function(
     }
 
     res <- index  |>
-      left_join(candidates, by = "doc_id")  |>
-      left_join(label_disribution, by = "label_id")  |>
+      inner_join(candidates, by = "doc_id", na_matches = "never")  |>
+      left_join(label_disribution, by = "label_id", na_matches = "never")  |>
       select(
         doc_id,
         label_id,
