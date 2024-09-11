@@ -10,10 +10,10 @@ search:
 
 train:
   xgb:
-    n_rounds: 500
-    interaction_depth: 10
-    shrinkage: 0.1
-    subsample: 1.0
+    n_rounds: 812
+    interaction_depth: 7
+    shrinkage: 0.023
+    subsample: 0.62
     verbose: TRUE
     n_jobs: 40
 
