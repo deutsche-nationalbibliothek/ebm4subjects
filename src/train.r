@@ -33,9 +33,9 @@ option_list = list(
     metavar = "character"
   ),
   make_option(
-    c("--n_trees"),
+    c("--n_rounds"),
     type = "integer", default = 100,
-    help = "number of trees in the GBM model",
+    help = "number of boosting iterations",
     metavar = "integer"
   ),
   make_option(
@@ -47,7 +47,13 @@ option_list = list(
   make_option(
     c("--shrinkage"),
     type = "numeric", default = 0.2,
-    help = "shrinkage parameter for the GBM model",
+    help = "shrinkage parameter for the GBM model between 0 and 1",
+    metavar = "numeric"
+  ),
+  make_option(
+    c("--subsample"),
+    type = "numeric", default = 0.5,
+    help = "subsample ratio of the training instances",
     metavar = "numeric"
   ),
   make_option(
@@ -61,6 +67,11 @@ option_list = list(
     type = "character", default = "results/train/model.rds",
     help = "path to the output file",
     metavar = "character"
+  ),
+  make_option( 
+    c("--n_jobs"), type = "integer", default = 20,
+    help = "number of jobs to run in parallel",
+    metavar = "integer"
   )
 )
 
@@ -71,8 +82,7 @@ suppressPackageStartupMessages(library(tidyverse))
 suppressPackageStartupMessages(library(future))
 suppressPackageStartupMessages(library(arrow))
 library(aeneval)
-library(tree)
-library(gbm)
+library(xgboost)
 
 source("src/prepare_data_for_gbm.r")
 
@@ -103,18 +113,25 @@ model_data_train <- prepare_data(
 
 # plot(tree_model)
 # text(tree_model, pretty = 0)
+library(future)
+plan(multicore, workers = opt$n_jobs)
 message("training model with parameters:\n n_trees = ", opt$n_trees,
         ",\n interaction_depth = ", opt$interaction_depth,
         ",\n shrinkage = ", opt$shrinkage,
         ",\n verbose = ", opt$verbose)
-bst <- gbm(
-  gold ~ .,
-  data = model_data_train,
-  distribution = "bernoulli",
-  n.trees = opt$n_trees,
-  interaction.depth = opt$interaction_depth,
-  shrinkage = opt$shrinkage,
-  verbose = opt$verbose
+
+xgb_matrix <- model.matrix(~ score + label_freq + occurrences + first_occurence + last_occurence + spread, data = model_data_train)
+
+bst <- xgboost(
+  data = xgb.DMatrix(data = xgb_matrix, label = model_data_train$gold),
+  nrounds = opt$n_rounds,
+  objective = "binary:logistic",
+  eval_metric = "logloss",
+  max_depth = opt$interaction_depth,
+  subsample = opt$subsample,
+  eta = opt$shrinkage,
+  nthread = opt$n_jobs,
+  verbose = 1
 )
 
 message("saving model...")

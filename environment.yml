@@ -14,14 +14,18 @@ dependencies:
   - tqdm
   - nltk
   - ipykernel # for interactive work in jupyter-notebooks
-  
+  - optuna
+  - optuna-dashboard
+
   # train.r
   - r-gbm
   - r-tree
   - r-randomforest
+  - r-xgboost
 
   # compute_metrics.r
   - r-base
+  - r-languageserver
   - r-aeneval==0.1.14
   - r-optparse
   - r-rjson

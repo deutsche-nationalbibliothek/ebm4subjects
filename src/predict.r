@@ -11,7 +11,7 @@ option_list = list(
   ),
   make_option(
     c("--test_index"),
-    type = "character", default = "corpora/ftoa/test.arrow",
+    type = "character", default = "corpora/ft30k/test.arrow",
     help = "path to the test index file",
     metavar = "character"
   ),
@@ -56,7 +56,7 @@ suppressPackageStartupMessages(library(tidyverse))
 suppressPackageStartupMessages(library(future))
 suppressPackageStartupMessages(library(arrow))
 library(aeneval)
-library(gbm)
+library(xgboost)
 
 source("src/prepare_data_for_gbm.r")
 
@@ -82,9 +82,14 @@ model_data <- prepare_data(
   max_docs = opt$max_docs
 )
 
+xgb_matrix <- model.matrix(
+  ~ score + label_freq + occurrences + first_occurence + last_occurence + spread,
+  data = model_data
+)
+
 # Make predictions
 message("making predictions...")
-preds <- predict(bst, model_data, type = "response")
+preds <- predict(bst, xgb_matrix)
 
 predictions <- model_data  |>
   mutate(score = preds)  |>

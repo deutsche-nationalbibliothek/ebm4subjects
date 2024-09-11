@@ -1,3 +1,4 @@
 /predictions.arrow
 /pr_curve.csv
 /candidates.arrow
+/model.rds

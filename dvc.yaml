@@ -79,14 +79,17 @@ stages:
         --train_candidates results/train/candidates.arrow
         --label_distribution assets/gnd-label-distribution.arrow
         --model_file results/train/model.rds
-        --n_trees ${train.gbm.n_trees}
-        --interaction_depth ${train.gbm.interaction_depth}
-        --shrinkage ${train.gbm.shrinkage}
-        --verbose ${train.gbm.verbose}
+        --n_rounds ${train.xgb.n_rounds}
+        --subsample ${train.xgb.subsample}
+        --interaction_depth ${train.xgb.interaction_depth}
+        --shrinkage ${train.xgb.shrinkage}
+        --verbose ${train.xgb.verbose}
+        --n_jobs ${train.xgb.n_jobs}
     params:
-      - train.gbm.n_trees
-      - train.gbm.interaction_depth
-      - train.gbm.shrinkage
+      - train.xgb.n_rounds
+      - train.xgb.interaction_depth
+      - train.xgb.shrinkage
+      - train.xgb.subsample
     deps:
       - src/train.r
       - src/prepare_data_for_gbm.r

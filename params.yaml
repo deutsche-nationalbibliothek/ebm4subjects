@@ -9,11 +9,13 @@ search:
   n_jobs: 40
 
 train:
-  gbm:
-    n_trees: 500
-    interaction_depth: 10 
-    shrinkage: 0.1
+  xgb:
+    n_rounds: 812
+    interaction_depth: 7
+    shrinkage: 0.023
+    subsample: 0.62
     verbose: TRUE
+    n_jobs: 40
 
 predict:
   top_k: 100
