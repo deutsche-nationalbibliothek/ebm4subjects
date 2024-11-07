@@ -7,6 +7,29 @@ stages:
     outs:
       - vocab/gnd_pref_labels.arrow
 
+  create_vocab_collection:
+    cmd: 
+      - > 
+        python src/create_vocab_collection.py \
+          --ttl_file vocab/gnd.ttl \
+          --collection_name ${vocab_config.collection_name} \
+          --overwrite ${vocab_config.overwrite} \
+          --TEI_port ${general.TEI_port} \
+          --phrase "${vocab_config.phrase}" \
+          --use_altLabels ${vocab_config.use_altLabels} \
+          --arrow_out ${vocab_config.collection_copy}
+    deps:
+      - src/create_vocab_collection.py
+      - vocab/gnd.ttl
+    params:
+      - vocab_config.collection_name
+      - vocab_config.overwrite
+      - general.TEI_port
+      - vocab_config.phrase
+      - vocab_config.use_altLabels
+    outs:
+      - ${vocab_config.collection_copy}
+
   create_collection:
     foreach:
       - train
