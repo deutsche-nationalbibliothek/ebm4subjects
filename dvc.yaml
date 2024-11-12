@@ -118,21 +118,19 @@ stages:
         - mkdir -p results/${item}/
         - >
           python src/index_corpus.py 
-          --corpus corpora/${task.name}/${item}.tsv.gz
-          --index corpora/${task.name}/${item}.arrow 
-          --pref_labels vocab/gnd_pref_labels.arrow
+          --chunks results/${item}/chunks.txt
+          --chunk_index results/${item}/chunk_index.arrow 
+          --chunk_embeddings results/${item}/chunk_embeddings.pkl
           --alpha ${search.alpha}
           --top_k ${search.top_k}
           --n_hits ${search.n_hits}
-          --out results/${item}/candidates.arrow
+          --output results/${item}/candidates.arrow
           --n_jobs ${search.n_jobs}
-          --task ${task.name}
-          --evalset ${item}
       deps:
         - src/index_corpus.py
-        - results/${item}/collection_name.txt
-        - corpora/${task.name}/${item}.tsv.gz
-        - corpora/${task.name}/${item}.arrow
+        - results/${item}/chunk_index.arrow 
+        - results/${item}/chunk_embeddings.pkl
+        - results/${item}/chunks.txt
       params:
         - search.alpha
         - search.top_k

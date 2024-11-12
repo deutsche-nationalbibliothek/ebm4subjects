@@ -1,6 +1,7 @@
 import weaviate
 import weaviate.classes as wvc
 from weaviate.classes.query import Filter
+import torch
 import pandas as pd
 import numpy as np
 import requests
@@ -11,11 +12,13 @@ import multiprocessing
 from tqdm import tqdm
 import time
 import hashlib
-import nltk
+from dvc.api import params_show
+import logging
+from functools import partial
 
-sentence_tokenizer = nltk.data.load("tokenizers/punkt/german.pickle")
 # Create argument parser
 parser = argparse.ArgumentParser(description='Process command line arguments')
+
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -27,247 +30,196 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
+class Indexer:
 
-# Add arguments with default values
-parser.add_argument('--corpus', type=str, default='corpora/title/test.tsv.gz', help='Corpus to be indexed')
-parser.add_argument('--index', type=str, default='corpora/title/test.arrow', help='Index file')
-parser.add_argument('--max_docs', type=int, default=-1, help='Maximum number of documents to index')
-parser.add_argument('--alpha', type=float, default=0.0, help='Alpha value for hybrid search')
-parser.add_argument('--top_k', type=int, default=100, help='Number of top k results to keep')
-parser.add_argument('--n_hits', type=int, default=20, help='Number of hits to retrieve from Hybrid Search')
-parser.add_argument('--chunk_size', type=int, default=1000, help='Chunk size')
-parser.add_argument('--max_sentences_per_doc', type=int, default=500, help='Maximum number of sentences per document')
-parser.add_argument('--fixed_length_chunking', type=str2bool, nargs='?', const=True, default=False, help='Use fixed length chunking')
-parser.add_argument('--pref_labels', type=str, default='vocab/gnd_pref_labels.arrow', help='Data frame with preferred labels')
-parser.add_argument('--n_jobs', type=int, default=20, help='Number of parallel jobs')
-parser.add_argument('--output', type=str, default='results/test/predictions.arrow', help='Output file')
-parser.add_argument('--task', type=str, default='title', help='Task name')
-parser.add_argument('--evalset', type=str, default='test', help='Evaluation set')
+    def __init__(self, alpha, n_hits, top_k, vocab_collection):
+        self.alpha = alpha
+        self.n_hits = n_hits
+        self.top_k = top_k
+        self.vocab_collection = vocab_collection
 
-# Parse arguments
-args = parser.parse_args()
+    def index_chunk(
+            self,
+            text_query: str, 
+            embedding: list,
+            doc_id: str, 
+            client: weaviate.Client, 
+    ):
+        vocab_collection = client.collections.get(self.vocab_collection)
 
-# Access the arguments
-corpus = args.corpus
-index = args.index
-alpha = args.alpha
-top_k = args.top_k
-n_hits = args.n_hits
-chunk_size = args.chunk_size
-max_sentences_per_doc = args.max_sentences_per_doc
-fixed_length_chunking = args.fixed_length_chunking
-if not FileExistsError(corpus):
-    sys.exit("Corpus file does not exist. Exiting...")
-pref_labels = args.pref_labels
-n_jobs = args.n_jobs
-output = args.output
-task = args.task
-evalset = args.evalset
-
-def index_chunk(text_query, doc_id, chunk_id, client, alpha, chunking_config, n_hits = n_hits, host='8090'):
-    gnd_collection = client.collections.get('Gnd859k_baai_bge_m3')
-    text_collection = client.collections.get(f'{task}_{evalset}_baai_bge_m3')
-    embedding_response = None
-    # check if doc_id and chunk_id are already vectorzied and stored in text_collection
-    text_collection_response = text_collection.query.fetch_objects(
-        filters=(
-            Filter.by_property('doc_id').equal(doc_id) & 
-            Filter.by_property('chunk_id').equal(chunk_id) &
-            Filter.by_property('chunking_config').equal(chunking_config)
-        ),
-        limit=1,
-        include_vector = True
-    )
-    if not text_collection_response.objects:
-        for _ in range(100):
-            try:
-                embedding_response = requests.post(
-                    'http://127.0.0.1:{}/embed'.format(host),
-                    headers={"Content-Type": "application/json"},
-                    json={'inputs': text_query}).json()
-                break
-            except Exception as e:
-                # print("An error occurred:", str(e))
-                # print("Retrying...")
-                time.sleep(1)
-    else:
-        # print("found existing embedding for doc_id:", doc_id, "chunk_id:", chunk_id)
-        embedding_response = text_collection_response.objects[0].vector['default']
-
-    
-    if embedding_response is None:
-        print("Failed to get embedding for text query:", text_query, "doc_id:", doc_id)
-        return {}
-
-    embedding = list(
-        np.array(
-            embedding_response
-        ).reshape(-1)
-    )
-    # store embedding in text_collection
-    if not text_collection_response.objects:
-        # print("Storing new embedding for doc_id:", doc_id, "chunk_id:", chunk_id)
-        text_collection.data.insert(
-            properties={
-                'doc_id': doc_id,
-                'chunk_id': chunk_id,
-                'chunk_text': text_query,
-                'chunking_config': chunking_config
-            },
-            vector=embedding
+        response = vocab_collection.query.hybrid(
+            query=text_query,
+            vector=embedding.numpy(),
+            limit=self.n_hits,
+            return_metadata=MetadataQuery(score=True),
+            alpha=self.alpha
         )
 
-    response = gnd_collection.query.hybrid(
-        query=text_query,
-        vector=embedding,
-        limit=n_hits,
-        return_metadata=MetadataQuery(score=True),
-        alpha=alpha
-    )
+        df = pd.DataFrame(
+            [
+                dict(
+                    doc_id=doc_id,
+                    label_id=o.properties['idn'],
+                    score=o.metadata.score,
+                    is_prefLabel=o.properties['is_prefLabel']
+                )
+                for o in response.objects
+            ]
+        )
 
-    df = pd.DataFrame(
-        [
-            dict(
-                doc_id=doc_id,
-                label_id=o.properties['idn'],
-                score=o.metadata.score
-            )
-            for o in response.objects
-        ]
-    )
+        # group by label_id and only keep rows with the highest score per label_id
+        if not df.empty:
+            df = df.sort_values('score', ascending=False).groupby('label_id').head(1)
+            return df
+        else:
+            return {}
 
-    # group by label_id and only keep rows with the highest score per label_id
-    if not df.empty:
-        df = df.sort_values('score', ascending=False).groupby('label_id').head(1)
+    def index_text(self, chunks: list, embeddings: list, doc_id: str, client: weaviate.Client):
+        # Split the text into chunks of 1000 characters
+        candidates = pd.DataFrame(columns=['doc_id', 'label_id', 'score', 'chunk_position', 'is_prefLabel'])
+        n_chunks = len(chunks)
+        for i in range(n_chunks):
+            # skip 1-word chunks
+            #if len(chunks[i].split()) <= 1:
+            #    continue
+            chunk_df = self.index_chunk(
+                text_query = chunks[i],
+                embedding = embeddings[i], 
+                doc_id = doc_id, 
+                client = client)
+            if not chunk_df.empty:
+                chunk_df['chunk_position'] = i/n_chunks
+                if not candidates.empty:
+                    candidates = pd.concat([candidates, chunk_df])
+                else:
+                    candidates = chunk_df
+
+        df = candidates.groupby('label_id').agg(
+            score=('score', 'sum'),
+            occurrences=('doc_id', 'count'),
+            first_occurence=('chunk_position', 'min'),
+            last_occurence=('chunk_position', 'max'),
+            spread=('chunk_position', lambda x: x.max() - x.min()),
+            is_prefLabel=('is_prefLabel', 'any')
+        ).reset_index()
+        df.columns = ['label_id', 'score', 'occurrences', 'first_occurence', 'last_occurence', 'spread', 'is_prefLabel']
+        # normalize score by n_chunks
+        df['score'] = df['score'] / n_chunks
+        # add new column doc_id at as first column, filled with the constand value `doc_id` as passed to the function
+        df.insert(0, 'doc_id', doc_id)
+        # arrange by score and keep top K
+        df = df.sort_values('score', ascending=False).head(self.top_k)
+
         return df
-    else:
-        return {}
-
-def index_text(text: str, doc_id: str, client, alpha: float, top_k: int = 100, chunk_size: int = 1000, max_sentences_per_doc: int = None, fixed_length_chunking: bool = False):
-    # Split the text into chunks of 1000 characters
-    chunks = []
-    if not fixed_length_chunking:
-        try:
-            chunks = sentence_tokenizer.tokenize(text)
-            chunks = [chunk for chunk in chunks if len(chunk) >= 10]
-            n_chunks = len(chunks)
-        except Exception as e:
-            print("An error occurred during sentence tokenization:", str(e))
-            fixed_length_chunking = True
-        if n_chunks >= 1500:
-            # print("Warning: Number of chunks", n_chunks, "is greater than 1500\n")
-            # print("Restricting to fixed length chunking.\n")
-            fixed_length_chunking = True
-        elif n_chunks >= max_sentences_per_doc:
-            # print("Warning: Number of chunks", n_chunks, "is greater than", max_sentences_per_doc, "\n") 
-            # print("Restricting to", max_sentences_per_doc, "sentences.\n")
-            chunks = chunks[:max_sentences_per_doc]
-    
-    if fixed_length_chunking:
-        local_chunk_size = min(chunk_size, len(text))
-        chunks = [text[i:i + local_chunk_size] for i in range(0, len(text), local_chunk_size)]
-        chunks = chunks[:max_sentences_per_doc]
-    candidates = pd.DataFrame(columns=['doc_id', 'label_id', 'score', 'chunk_position'])
-    chunk_position = 0
-    n_chunks = len(chunks)
-    for chunk in chunks:
-        chunking_config = f'fixed_length_chunking_{chunk_size}' if fixed_length_chunking else 'sentence_tokenization_{max_sentences_per_doc}'
-        if len(chunk.split()) <= 1:
-            continue
-        chunk_md5 = hashlib.md5(chunk.encode()).hexdigest()
-        chunk_df = index_chunk(chunk, doc_id, chunk_md5, client, alpha, chunking_config)
-        if not chunk_df.empty:
-            chunk_df['chunk_position'] = chunk_position/n_chunks
-            if not candidates.empty:
-                candidates = pd.concat([candidates, chunk_df])
-            else:
-                candidates = chunk_df
-        chunk_position += 1
-
-    df = candidates.groupby('label_id').agg(
-        score=('score', 'sum'),
-        occurrences=('doc_id', 'count'),
-        first_occurence=('chunk_position', 'min'),
-        last_occurence=('chunk_position', 'max'),
-        spread=('chunk_position', lambda x: x.max() - x.min())
-    ).reset_index()
-    df.columns = ['label_id', 'score', 'occurrences', 'first_occurence', 'last_occurence', 'spread']
-    # normalize score by n_chunks
-    df['score'] = df['score'] / n_chunks
-    # add new column doc_id at as first column, filled with the constand value `doc_id` as passed to the function
-    df.insert(0, 'doc_id', doc_id)
-    # arrange by score and keep top K
-    df = df.sort_values('score', ascending=False).head(top_k)
-
-    return df
-
-df_index = pd.read_feather(index)
-if args.max_docs > 0:
-    df_index = df_index.head(args.max_docs)
-
-# Get the data from the tsv.gz corpus fil
-df_documents = pd.read_csv(
-    corpus,
-    compression="gzip",
-    sep="\t",
-    header=None,
-    names=["content", "ground_truth"],
-    nrows=df_index.shape[0]
-)
-
-df_documents["doc_id"] = df_index.idn
-
-# df_documents = df_documents.head(10)
 
 # Define the function to be executed in parallel
-def process_document(row, client):
-    if isinstance(row, dict):
-        text_query = row['content']
-        doc_id = row['doc_id']
-    else:
-        text_query = row.content
-        doc_id = row.doc_id
+def process_document(item, client: weaviate.Client, indexer: Indexer):
+    if not isinstance(item, dict):
+        raise ValueError("Row must be an instance of dict")
+    chunks = item['chunks']
+    embeddings = item['embeddings']
+    doc_id = item['doc_id']
+
     # print(f"Processing document {doc_id}")
     try:
-        return index_text(text_query, doc_id, client, alpha, top_k, chunk_size, max_sentences_per_doc, fixed_length_chunking)
+        return indexer.index_text(chunks=chunks,
+                          embeddings=embeddings, 
+                          doc_id = doc_id, 
+                          client = client)
     except Exception as e:
         print("An error occurred in doc_id", doc_id, str(e))
         return None
 
 # Define the function to process a batch of documents
-def process_batch(batch, position):
+def process_batch(batch, position, indexer: Indexer):
     # batch_id = multiprocessing.current_process()._identity[0]
     # print(f"Processing batch {batch_id}")
     client = weaviate.connect_to_local()
     if not client.is_ready():
       sys.exit("Weaviate client is not ready. Exiting...")
     result = []
-    for row in (pbar := tqdm(batch, total=len(batch), position=position, leave=True)):
+    for item in (pbar := tqdm(batch, total=len(batch), position=position, leave=True)):
         pbar.set_description(f"{position:02}")
-        result.append(process_document(row, client))
+        result.append(
+            process_document(item, client, indexer))
     client.close()
     return result
 
-# Split df_documents into batches
-batch_size = len(df_documents) // n_jobs
-batches = [df_documents.iloc[i:i + batch_size].to_dict(orient='records') for i in range(0, len(df_documents), batch_size)]
+if __name__ == '__main__':
+    # Add arguments with default values
+    parser.add_argument('--chunks', type=str, default='results/test/chunks.txt', help='Text chunks to be indexed')
+    parser.add_argument('--chunk_index', type=str, default='results/test/chunk_index.arrow', help='Index file containing a mapping of documents and chunks')
+    parser.add_argument('--chunk_embeddings', type=str, default='results/test/embeddings.arrow', help='Embeddings file matching the chunks and chunk_index')
+    parser.add_argument('--alpha', type=float, default=0.0, help='Alpha value for hybrid search')
+    parser.add_argument('--top_k', type=int, default=100, help='Number of top k results to keep')
+    parser.add_argument('--n_hits', type=int, default=20, help='Number of hits to retrieve from Hybrid Search')
+    parser.add_argument('--n_jobs', type=int, default=20, help='Number of parallel jobs')
+    parser.add_argument('--output', type=str, default='results/test/candidates.arrow', help='Output file')
 
-# Create a list of (batch, position) tuples
-batches_with_positions = [(batch, i) for i, batch in enumerate(batches)]
+    # Parse arguments
+    args = parser.parse_args()
 
-# Apply the function to each batch in parallel
-parallel = True
-if parallel:
+    # Set up logging
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    logger = logging.getLogger(__name__)
+
+    # Load parameters from params.yaml
+    params = params_show()
+
+    indexer = Indexer(
+        alpha=args.alpha, n_hits=args.n_hits, top_k=args.top_k, 
+        vocab_collection=params["vocab_config"]["collection_name"]
+        )
+
+    n_jobs = args.n_jobs
+    output = args.output
+
+
+    logger.info("Reading chunks and chunk index")
+    # Get the data from previous stages chunk_texts and embed_chunks
+    with open(args.chunks, 'r', encoding='utf-8') as file:
+        chunks = file.readlines()
+    chunk_index = pd.read_feather(args.chunk_index)
+    logger.info("Reading torch embeddings")
+    chunk_embdeddings = torch.load(args.chunk_embeddings, weights_only=True)
+    chunk_embdeddings = chunk_embdeddings.to('cpu')
+    docs_w_emb = []
+
+    # Iterate over unique doc_ids in the chunk index
+    for doc_id in chunk_index['doc_id'].unique():
+        # Get the chunks and embeddings for the current doc_id
+        this_docs_chunk_ids = chunk_index[chunk_index['doc_id'] == doc_id]['abs_chunk_position'].tolist()
+        start = this_docs_chunk_ids[0]
+        end = this_docs_chunk_ids[-1] + 1
+        doc_chunks = chunks[start:end]
+        doc_embeddings = chunk_embdeddings[start:end, :]
+        # Create a dictionary for the current document
+        doc_item = {
+            'doc_id': doc_id,
+            'chunks': doc_chunks,
+            'embeddings': doc_embeddings
+        }
+        # Append the document item to the list
+        docs_w_emb.append(doc_item)
+
+    batch_size = int(len(docs_w_emb) / n_jobs) + (len(docs_w_emb) % n_jobs > 0)
+
+    batches = [(
+        docs_w_emb[i:i + batch_size],
+        i // batch_size,
+        indexer
+    ) for i in range(0, len(docs_w_emb), batch_size)]
+    
+    # Apply the function to each batch in parallel
+    multiprocessing.set_start_method('spawn')
     with multiprocessing.Pool(processes=n_jobs) as pool:
-        results = pool.starmap(process_batch, batches_with_positions)
-else:
-    results = [process_batch(batch,i) for i, batch in enumerate(batches)]
+        results = pool.starmap(process_batch, batches)
 
-# Concatenate the results
-inner_results_list = [pd.concat(result) for result in results if result is not None]
-df_results = pd.concat([result for result in inner_results_list if not result.empty])
+    # Concatenate the results
+    inner_results_list = [pd.concat(result) for result in results if result is not None]
+    df_results = pd.concat([result for result in inner_results_list if not result.empty])
 
-# Write results arrow file to 'output'
-df_results.to_feather(output)
+    # Write results arrow file to 'output'
+    df_results.to_feather(output)
 
 

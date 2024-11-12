@@ -11,8 +11,8 @@ vocab_config:
 
 chunk_opts:
   chunk_size: 500
-  max_chunks: 10
-  max_docs: 300
+  max_chunks: 100
+  max_docs: 30000
   max_sentences_per_doc: 600
   fixed_length_chunking: false
   n_jobs: 10
@@ -21,7 +21,7 @@ search:
   alpha: 0.625
   top_k: 100
   n_hits: 20
-  n_jobs: 3
+  n_jobs: 10
 
 train:
   xgb:
