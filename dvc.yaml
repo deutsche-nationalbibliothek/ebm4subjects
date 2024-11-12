@@ -20,6 +20,7 @@ stages:
           --arrow_out ${vocab_config.collection_copy}
     deps:
       - src/create_vocab_collection.py
+      - src/generate_embeddings.py
       - vocab/gnd.ttl
     params:
       - vocab_config.collection_name
@@ -50,6 +51,63 @@ stages:
             cache: false
 
 
+  chunk_texts:
+    foreach:
+      - train
+      - validate
+      - test
+    do:
+      cmd:
+        - mkdir -p results/${item}/
+        - >
+          python src/chunk_texts.py 
+          --corpus corpora/${task.name}/${item}.tsv.gz 
+          --index corpora/${task.name}/${item}.arrow
+          --chunk_texts_output results/${item}/chunks.txt
+          --chunk_index_output results/${item}/chunk_index.arrow
+          --chunk_size ${chunk_opts.chunk_size}
+          --max_chunks ${chunk_opts.max_chunks}
+          --max_docs ${chunk_opts.max_docs}
+          --max_sentences_per_doc ${chunk_opts.max_sentences_per_doc}
+          --fixed_length_chunking ${chunk_opts.fixed_length_chunking}
+          --n_jobs ${chunk_opts.n_jobs}
+      deps:
+        - src/chunk_texts.py
+        - corpora/${task.name}/${item}.tsv.gz
+        - corpora/${task.name}/${item}.arrow
+      params:
+        - chunk_opts.chunk_size
+        - chunk_opts.max_chunks
+        - chunk_opts.max_docs
+        - chunk_opts.max_sentences_per_doc
+        - chunk_opts.fixed_length_chunking
+        # - chunk_opts.n_jobs # n_jobs doesn't need to be a dvc dependency, as it has no effect on the output
+      outs:
+        - results/${item}/chunk_index.arrow
+        - results/${item}/chunks.txt
+
+  embed_chunks:
+    foreach:
+      - train
+      - validate
+      - test
+    do:
+      cmd:
+        - mkdir -p results/${item}/
+        - >
+          python src/embed_chunks.py 
+          --chunks results/${item}/chunks.txt 
+          --batch_size 32
+          --out results/${item}/chunk_embeddings.pkl
+      deps:
+        - src/embed_chunks.py
+        - src/generate_embeddings.py
+        - results/${item}/chunks.txt
+      params:
+        - general.embedding_model
+      outs:
+        - results/${item}/chunk_embeddings.pkl
+
   index_candidates:
     foreach:
       - train
@@ -62,14 +120,10 @@ stages:
           python src/index_corpus.py 
           --corpus corpora/${task.name}/${item}.tsv.gz
           --index corpora/${task.name}/${item}.arrow 
-          --max_docs ${search.max_docs}
           --pref_labels vocab/gnd_pref_labels.arrow
           --alpha ${search.alpha}
           --top_k ${search.top_k}
           --n_hits ${search.n_hits}
-          --chunk_size ${search.chunk_size}
-          --max_sentences_per_doc ${search.max_sentences_per_doc}
-          --fixed_length_chunking ${search.fixed_length_chunking}
           --out results/${item}/candidates.arrow
           --n_jobs ${search.n_jobs}
           --task ${task.name}
@@ -83,10 +137,6 @@ stages:
         - search.alpha
         - search.top_k
         - search.n_hits
-        - search.chunk_size
-        - search.max_sentences_per_doc
-        - search.max_docs
-        - search.fixed_length_chunking
         # search.n_jobs doesn't need to be a dvc dependency, as it has no effect on the output
         - task.name
       outs:
@@ -98,7 +148,7 @@ stages:
       - >
         Rscript src/train.r --ground_truth corpora/ground-truth.arrow
         --train_index corpora/${task.name}/train.arrow
-        --max_docs ${search.max_docs}
+        --max_docs ${chunk_opts.max_docs}
         --train_candidates results/train/candidates.arrow
         --label_distribution assets/gnd-label-distribution.arrow
         --model_file results/train/model.rds
@@ -135,13 +185,13 @@ stages:
           --model_file results/train/model.rds
           --test_index corpora/${task.name}/${item}.arrow
           --test_candidates results/${item}/candidates.arrow
-          --max_docs ${search.max_docs}
+          --max_docs ${chunk_opts.max_docs}
           --label_distribution assets/gnd-label-distribution.arrow
           --top_k ${predict.top_k}
           --out_file results/${item}/predictions.arrow
       params:
         - predict.top_k
-        - search.max_docs
+        - chunk_opts.max_docs
       deps:
         - src/predict.r
         - src/prepare_data_for_gbm.r
