@@ -1,13 +1,13 @@
-md5: d3d224d88ac5c60874f858b9fa6a3de5
+md5: 01758e3bc802d941a73debc155de65e2
 frozen: true
 deps:
-- path: corpora/ft30k/test.arrow
+- path: corpora/ftoa/validate.tsv.gz
   repo:
     url: git@gitlab.prod.jason.dnb.de:aen/ki-tfidf-dataset.git
     rev: v3.2.1
     rev_lock: 71d10964685335189d424f62c7e5d7df53f3a4ef
 outs:
-- md5: 92b20edbbd46039c16bd5008b568bc89
-  size: 187122
+- md5: 086f20d34e8a56079e5b5fe83e823038
+  size: 10194799
   hash: md5
-  path: test.arrow
+  path: validate.tsv.gz

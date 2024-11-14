@@ -1,13 +1,13 @@
-md5: 2a91c751a9c0e28c9d53a19a777282f9
+md5: 9c1bc292e94873b25afeb6db7fde744c
 frozen: true
 deps:
-- path: corpora/ft30k/train.tsv.gz
+- path: corpora/ftoa/test.tsv.gz
   repo:
     url: git@gitlab.prod.jason.dnb.de:aen/ki-tfidf-dataset.git
     rev: v3.2.1
     rev_lock: 71d10964685335189d424f62c7e5d7df53f3a4ef
 outs:
-- md5: 96a705f41f1c8e04ad1cb490351e5ecb
-  size: 1687280336
+- md5: 1bb18b431fb9c9ed37afbb1485710e8e
+  size: 6440270
   hash: md5
-  path: train.tsv.gz
+  path: test.tsv.gz

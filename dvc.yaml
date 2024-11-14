@@ -26,30 +26,12 @@ stages:
       - vocab_config.collection_name
       - vocab_config.overwrite
       - general.TEI_port
+      - general.embedding_model
+      - general.embedding_dim
       - vocab_config.phrase
       - vocab_config.use_altLabels
     outs:
       - ${vocab_config.collection_copy}
-
-  create_collection:
-    foreach:
-      - train
-      - validate
-      - test
-    do:
-      always_changed: false
-      cmd:
-        - mkdir -p results/${item}/ 
-        - python src/create_collection.py --task ${task.name} --evalset ${item} --collection_name_file results/${item}/collection_name.txt --overwrite ${collection.overwrite}
-      deps:
-        - src/create_collection.py
-      params:
-        - task.name
-        - collection.overwrite
-      outs:
-        - results/${item}/collection_name.txt:
-            cache: false
-
 
   chunk_texts:
     foreach:
@@ -97,16 +79,17 @@ stages:
         - >
           python src/embed_chunks.py 
           --chunks results/${item}/chunks.txt 
-          --batch_size 64
-          --out results/${item}/chunk_embeddings.pkl
+          --batch_size 128
+          --out results/${item}/chunk_embeddings.npy
       deps:
         - src/embed_chunks.py
         - src/generate_embeddings.py
         - results/${item}/chunks.txt
       params:
         - general.embedding_model
+        - general.embedding_dim
       outs:
-        - results/${item}/chunk_embeddings.pkl
+        - results/${item}/chunk_embeddings.npy
 
   index_candidates:
     foreach:
@@ -120,7 +103,7 @@ stages:
           python src/index_corpus.py 
           --chunks results/${item}/chunks.txt
           --chunk_index results/${item}/chunk_index.arrow 
-          --chunk_embeddings results/${item}/chunk_embeddings.pkl
+          --chunk_embeddings results/${item}/chunk_embeddings.npy
           --alpha ${search.alpha}
           --top_k ${search.top_k}
           --n_hits ${search.n_hits}

@@ -1,7 +1,7 @@
 from generate_embeddings import generate_embeddings
 import pandas as pd
-import torch
 import argparse
+import numpy as np
 
 
 if __name__ == "__main__":
@@ -18,4 +18,4 @@ if __name__ == "__main__":
   # Generate embeddings
   embeddings = generate_embeddings(chunks, args.batch_size)
   # save embeddings
-  torch.save(embeddings, args.out)
+  np.save(args.out, embeddings)

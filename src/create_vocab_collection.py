@@ -21,7 +21,7 @@ def parse_vocab(ttl_path: Path, use_altLabels: bool = True, phrase: str = None) 
         graph = pyoxigraph.parse(f, RdfFormat.TURTLE)
         labels: list[(str, str, bool)] = []
         # uris: list[str] = []
-        #limit = 10000
+        # limit = 100
         #itertools.islice(graph, limit)
 
         for s,p,o,_  in tqdm(graph, desc="Processing triples"):

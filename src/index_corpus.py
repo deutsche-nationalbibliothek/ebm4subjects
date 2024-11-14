@@ -49,7 +49,7 @@ class Indexer:
 
         response = vocab_collection.query.hybrid(
             query=text_query,
-            vector=embedding.numpy(),
+            vector=embedding,
             limit=self.n_hits,
             return_metadata=MetadataQuery(score=True),
             alpha=self.alpha
@@ -181,8 +181,7 @@ if __name__ == '__main__':
         chunks = file.readlines()
     chunk_index = pd.read_feather(args.chunk_index)
     logger.info("Reading torch embeddings")
-    chunk_embdeddings = torch.load(args.chunk_embeddings, weights_only=True)
-    chunk_embdeddings = chunk_embdeddings.to('cpu')
+    chunk_embdeddings = np.load(args.chunk_embeddings)
     docs_w_emb = []
 
     # Iterate over unique doc_ids in the chunk index
