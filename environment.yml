@@ -1,4 +1,4 @@
-name: rag-w-gnd
+name: ebm4subjects
 channels:
   - conda-forge
   - aen-forge
@@ -16,20 +16,21 @@ dependencies:
   - ipykernel # for interactive work in jupyter-notebooks
   - optuna
   - optuna-dashboard
+  - pyoxigraph
 
   # train.r
   - r-gbm
   - r-tree
   - r-randomforest
   - r-xgboost
+  - r-tidyverse
+  - r-optparse
 
   # compute_metrics.r
   - r-base
   - r-languageserver
   - r-aeneval==0.1.14
-  - r-optparse
   - r-rjson
-  - r-tidyverse
   - r-arrow
   - r-svglite
   - pip:

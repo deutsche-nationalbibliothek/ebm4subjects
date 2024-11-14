@@ -1,16 +1,16 @@
 general:
   TEI_port: 8090
-  embedding_model: "BAAI/bge-m3"
+  embedding_model: BAAI/bge-m3
 
 vocab_config:
   overwrite: true
   collection_name: gnd204k_w_altlabels_a_phrase
-  phrase: "Ein gutes Schlagwort ist: "
+  phrase: 'Ein gutes Schlagwort ist: '
   use_altLabels: true
   collection_copy: vocab/gnd204k_w_altlabels.arrow
 
 chunk_opts:
-  chunk_size: 500
+  chunk_size: 100
   max_chunks: 100
   max_docs: 30000
   max_sentences_per_doc: 600
@@ -29,7 +29,7 @@ train:
     interaction_depth: 7
     shrinkage: 0.023
     subsample: 0.62
-    verbose: TRUE
+    verbose: true
     n_jobs: 40
 
 predict:

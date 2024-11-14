@@ -55,7 +55,8 @@ prepare_data <- function(
         occurrences,
         first_occurence,
         last_occurence,
-        spread
+        spread,
+        is_prefLabel
       )
   } else {
     index <- select(index, doc_id = idn)
@@ -85,7 +86,8 @@ prepare_data <- function(
         occurrences,
         first_occurence,
         last_occurence,
-        spread
+        spread,
+        is_prefLabel
       )
   }
 }

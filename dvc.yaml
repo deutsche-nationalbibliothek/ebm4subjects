@@ -97,7 +97,7 @@ stages:
         - >
           python src/embed_chunks.py 
           --chunks results/${item}/chunks.txt 
-          --batch_size 32
+          --batch_size 64
           --out results/${item}/chunk_embeddings.pkl
       deps:
         - src/embed_chunks.py
