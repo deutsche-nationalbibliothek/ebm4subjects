@@ -15,6 +15,16 @@ from generate_embeddings import generate_embeddings
 PREF_LABEL_IRI = "http://www.w3.org/2004/02/skos/core#prefLabel"
 ALT_LABEL_IRI = "http://www.w3.org/2004/02/skos/core#altLabel"
 
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
 def parse_vocab(ttl_path: Path, use_altLabels: bool = True, phrase: str = None) -> pd.DataFrame:
     print(f"Parsing vocabulary from {ttl_path}")
     with ttl_path.open("rb") as f:
@@ -147,17 +157,17 @@ def run():
     parser.add_argument("--collection_name", help="Collection Name in Weaviate", type=str, required=True)
     parser.add_argument("--TEI_port", help="Host", type=str, default='8090')
     parser.add_argument("--phrase", help="Phrase", type=str, default="Ein gutes Schlagwort für dieses Dokument lautet: ")
-    parser.add_argument("--overwrite", help="Overwrite", type=bool, default=True)
+    parser.add_argument("--overwrite", help="Overwrite", type=str, default=True)
     parser.add_argument("--arrow_out", help="Arrow output", type=str, default=None)
-    parser.add_argument("--use_altLabels", help="Use altLabels", type=bool, default=True)
+    parser.add_argument("--use_altLabels", help="Use altLabels", type=str, default=True)
     # parser.add_argument("--labelkind", help="Labelkind", type=list, default=["prefLabel"])
     args = parser.parse_args()
-    vocab = parse_vocab(Path(args.ttl_file), use_altLabels=args.use_altLabels, phrase=args.phrase)
+    vocab = parse_vocab(Path(args.ttl_file), use_altLabels=str2bool(args.use_altLabels), phrase=args.phrase)
 
     client = weaviate.connect_to_local()
-    if args.overwrite:
+    if str2bool(args.overwrite):
         embeddings = generate_embeddings(vocab["label_text"].tolist())
-        create_collection(client, args.collection_name, overwrite=args.overwrite, TEI_port=args.TEI_port)
+        create_collection(client, args.collection_name, overwrite=str2bool(args.overwrite), TEI_port=args.TEI_port)
         insert_vocab(client, args.collection_name, vocab, embeddings) 
         # Note: phrase is already passed to parse_vocab
     

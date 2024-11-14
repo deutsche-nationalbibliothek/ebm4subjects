@@ -112,7 +112,7 @@ stages:
       deps:
         - src/index_corpus.py
         - results/${item}/chunk_index.arrow 
-        - results/${item}/chunk_embeddings.pkl
+        - results/${item}/chunk_embeddings.npy
         - results/${item}/chunks.txt
       params:
         - search.alpha

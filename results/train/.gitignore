@@ -3,3 +3,4 @@
 /chunk_index.arrow
 /chunks.txt
 /chunk_embeddings.pkl
+/chunk_embeddings.npy

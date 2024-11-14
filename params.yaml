@@ -1,11 +1,11 @@
 general:
   TEI_port: 8090
   embedding_model: jinaai/jina-embeddings-v3
-  embedding_dim: 256
+  embedding_dim: 1024
 
 vocab_config:
-  overwrite: true
-  collection_name: gnd204k_w_altlabels_a_phrase_jina
+  overwrite: false
+  collection_name: gnd204k_w_altlabels_a_phrase_jina_dim1024
   phrase: 'Ein gutes Schlagwort ist: '
   use_altLabels: true
   collection_copy: vocab/gnd204k_w_altlabels.arrow
