@@ -1,3 +1,7 @@
 /predictions.arrow
 /pr_curve.csv
 /candidates.arrow
+/chunk_index.csv
+/chunks.txt
+/chunk_embeddings.pkl
+/chunk_index.arrow

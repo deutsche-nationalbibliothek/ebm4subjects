@@ -1,2 +1,5 @@
 /candidates.arrow
 /model.rds
+/chunk_index.arrow
+/chunks.txt
+/chunk_embeddings.pkl
