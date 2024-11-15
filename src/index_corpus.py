@@ -19,17 +19,6 @@ from functools import partial
 # Create argument parser
 parser = argparse.ArgumentParser(description='Process command line arguments')
 
-
-def str2bool(v):
-    if isinstance(v, bool):
-        return v
-    if v.lower() in ('yes', 'true', 't', 'y', '1'):
-        return True
-    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
-        return False
-    else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
-
 class Indexer:
 
     def __init__(self, alpha, n_hits, top_k, vocab_collection):
@@ -175,15 +164,16 @@ if __name__ == '__main__':
     output = args.output
 
 
-    logger.info("Reading chunks and chunk index")
+    logger.info("Reading chunks and chunk index...")
     # Get the data from previous stages chunk_texts and embed_chunks
     with open(args.chunks, 'r', encoding='utf-8') as file:
         chunks = file.readlines()
     chunk_index = pd.read_feather(args.chunk_index)
-    logger.info("Reading torch embeddings")
+    logger.info("Reading chunk embeddings...")
     chunk_embdeddings = np.load(args.chunk_embeddings)
     docs_w_emb = []
 
+    logger.info("Join chunk embeddings with chunk texts...")
     # Iterate over unique doc_ids in the chunk index
     for doc_id in chunk_index['doc_id'].unique():
         # Get the chunks and embeddings for the current doc_id
@@ -210,10 +200,12 @@ if __name__ == '__main__':
     ) for i in range(0, len(docs_w_emb), batch_size)]
     
     # Apply the function to each batch in parallel
+    logger.info("Generating candidates with Hybrid Search...")
     multiprocessing.set_start_method('spawn')
     with multiprocessing.Pool(processes=n_jobs) as pool:
         results = pool.starmap(process_batch, batches)
 
+    logger.info("Writing Outputs...")
     # Concatenate the results
     inner_results_list = [pd.concat(result) for result in results if result is not None]
     df_results = pd.concat([result for result in inner_results_list if not result.empty])

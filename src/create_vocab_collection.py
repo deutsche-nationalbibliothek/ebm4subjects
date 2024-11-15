@@ -11,19 +11,10 @@ import weaviate
 import weaviate.classes as wvc
 from weaviate.util import generate_uuid5
 from generate_embeddings import generate_embeddings
+from utils import str2bool
 
 PREF_LABEL_IRI = "http://www.w3.org/2004/02/skos/core#prefLabel"
 ALT_LABEL_IRI = "http://www.w3.org/2004/02/skos/core#altLabel"
-
-def str2bool(v):
-    if isinstance(v, bool):
-        return v
-    if v.lower() in ('yes', 'true', 't', 'y', '1'):
-        return True
-    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
-        return False
-    else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 def parse_vocab(ttl_path: Path, use_altLabels: bool = True, phrase: str = None) -> pd.DataFrame:
     print(f"Parsing vocabulary from {ttl_path}")

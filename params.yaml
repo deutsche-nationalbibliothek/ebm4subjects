@@ -4,7 +4,7 @@ general:
   embedding_dim: 1024
 
 vocab_config:
-  overwrite: true
+  overwrite: false
   collection_name: gnd204k_w_altlabels_no_phrase_jina_1024
   phrase: ''
   use_altLabels: true
@@ -15,7 +15,6 @@ chunk_opts:
   max_chunks: 100
   max_docs: 30000
   max_sentences_per_doc: 600
-  fixed_length_chunking: false
   n_jobs: 10
 
 search:

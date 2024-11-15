@@ -11,16 +11,15 @@ import logging
 nltk.download('punkt')
 
 class Chunker:
-    def __init__(self, max_chunks, chunk_size, max_sentences_per_doc, fixed_length_chunking):
+    def __init__(self, max_chunks, chunk_size, max_sentences_per_doc):
         self.max_chunks = max_chunks if max_chunks is not None else float('inf')
         self.chunk_size = chunk_size if chunk_size is not None else float('inf')
         self.max_sentences_per_doc = max_sentences_per_doc if max_sentences_per_doc is not None else float('inf')
-        self.fixed_length_chunking = fixed_length_chunking
         self.tokenizer = nltk.data.load("tokenizers/punkt/german.pickle")
 
     def __repr__(self):
         return (f"Chunker(max_chunks={self.max_chunks}, chunk_size={self.chunk_size}, "
-                f"max_sentences_per_doc={self.max_sentences_per_doc}, fixed_length_chunking={self.fixed_length_chunking})")
+                f"max_sentences_per_doc={self.max_sentences_per_doc})")
 
     def chunk_text(self, text, doc_id):
         chunks = []
@@ -58,7 +57,6 @@ if __name__ == '__main__':
     parser.add_argument('--chunk_size', type=int, default=1000, help='Maximum character length of one text chunk')
     parser.add_argument('--max_chunks', type=int, default=100, help='Maximum number of chunks per Document')
     parser.add_argument('--max_sentences_per_doc', type=int, default=500, help='Maximum number of sentences per document')
-    parser.add_argument('--fixed_length_chunking', type=bool, nargs='?', const=True, default=False, help='Use fixed length chunking')
     parser.add_argument('--n_jobs', type=int, default=20, help='Number of parallel jobs')
     parser.add_argument('--batch_size', type=int, default=100, help='Batch size for processing')
     parser.add_argument('--chunk_texts_output', type=str, default='results/test/chunks.txt', help='Output file for texxt chunks')
@@ -68,8 +66,7 @@ if __name__ == '__main__':
     chunker = Chunker(
         max_chunks=args.max_chunks if args.max_chunks != -1 else None,
         chunk_size=args.chunk_size,
-        max_sentences_per_doc=args.max_sentences_per_doc,
-        fixed_length_chunking=args.fixed_length_chunking
+        max_sentences_per_doc=args.max_sentences_per_doc
     )
 
     # Set up logging

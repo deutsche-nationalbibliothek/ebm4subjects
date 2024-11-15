@@ -51,7 +51,6 @@ stages:
           --max_chunks ${chunk_opts.max_chunks}
           --max_docs ${chunk_opts.max_docs}
           --max_sentences_per_doc ${chunk_opts.max_sentences_per_doc}
-          --fixed_length_chunking ${chunk_opts.fixed_length_chunking}
           --n_jobs ${chunk_opts.n_jobs}
       deps:
         - src/chunk_texts.py
@@ -62,7 +61,6 @@ stages:
         - chunk_opts.max_chunks
         - chunk_opts.max_docs
         - chunk_opts.max_sentences_per_doc
-        - chunk_opts.fixed_length_chunking
         # - chunk_opts.n_jobs # n_jobs doesn't need to be a dvc dependency, as it has no effect on the output
       outs:
         - results/${item}/chunk_index.arrow
