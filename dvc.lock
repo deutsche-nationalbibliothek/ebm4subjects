@@ -59,8 +59,8 @@ stages:
       size: 55898370
     - path: results/test/predictions.arrow
       hash: md5
-      md5: 53f3de08f11684243262e2b62033f991
-      size: 1487474
+      md5: cd16c0ea22a7896c98cf14e4e940d005
+      size: 1487658
     - path: src/compute_metrics.r
       hash: md5
       md5: ba86f225aa8f62b37405b1d394fe366d
@@ -72,31 +72,31 @@ stages:
     outs:
     - path: results//test/prec_at_5.json
       hash: md5
-      md5: c46bbbdf2f0436d3cf6f54745fccb735
+      md5: f85d082284cc77472ec4007bbe63cda1
       size: 37
     - path: results//test/rec_at_5.json
       hash: md5
-      md5: ade6d57a11fca2cd4dad759d085569ef
+      md5: a516025ae693641c1fc9ce5e11c7a973
       size: 36
     - path: results/test/f1_at_5.json
       hash: md5
-      md5: e28342e323d6b271ac2714f5f88b083e
+      md5: 9555d4cfd53cbfaca4727029d6baf4cf
       size: 35
     - path: results/test/pr_auc.json
       hash: md5
-      md5: 4c9d739389a803fa963440f38ae4dcaf
-      size: 27
+      md5: 90009ec560c530dd789c6ae8e0a98f19
+      size: 29
     - path: results/test/pr_curve.csv
       hash: md5
-      md5: c425e0fdb8ed6c53b07d1ca624777ef6
-      size: 3503
+      md5: a9f8571556c19a5482ab3a1d34c4f99a
+      size: 3526
     - path: results/test/pr_curve_plot.svg
       hash: md5
-      md5: ca8831fad791bc8b207907790110e813
-      size: 17768
+      md5: 1266441e8bbd46c58ddde31ff13b89f1
+      size: 17759
     - path: results/test/rprec_at_5.json
       hash: md5
-      md5: c0af199dfaabda7eb3c2b3df92f938b8
+      md5: ccb9d1df663087f74363a307b03a0645
       size: 38
   index_corpus@validate:
     cmd:
@@ -142,8 +142,8 @@ stages:
       size: 55898370
     - path: results/validate/predictions.arrow
       hash: md5
-      md5: 9b629eb84ef3a33694abc457469aeb7d
-      size: 2384506
+      md5: e92c970cc872caf14923d1b3d8a8268e
+      size: 2384378
     - path: src/compute_metrics.r
       hash: md5
       md5: ba86f225aa8f62b37405b1d394fe366d
@@ -155,31 +155,31 @@ stages:
     outs:
     - path: results//validate/prec_at_5.json
       hash: md5
-      md5: a0d59ac01715a85630e0fdab12e33740
+      md5: e23a3a7f1d14da9014717eeb7bf7b90c
       size: 37
     - path: results//validate/rec_at_5.json
       hash: md5
-      md5: 935d689427275704f6091a369c72aa48
+      md5: 5280ecd5525046b3d32630d20e3abef1
       size: 36
     - path: results/validate/f1_at_5.json
       hash: md5
-      md5: 40c57f22fad2efb8474b4b135dcbfbaf
+      md5: e4eb530fb71e269d7e5067ee9af88b8f
       size: 35
     - path: results/validate/pr_auc.json
       hash: md5
-      md5: ee2ee1ccd65d15791e6a3c30bddd9c31
+      md5: d913eb85a303b798077c5c36662f1d9e
       size: 29
     - path: results/validate/pr_curve.csv
       hash: md5
-      md5: 28541e0bcef61fa8fd2e4dc81e64d257
-      size: 3571
+      md5: f82978f17265dafdcbddcb26d27a536b
+      size: 3606
     - path: results/validate/pr_curve_plot.svg
       hash: md5
-      md5: 08a9ada0fc60d7b66fbb8051958cbb28
-      size: 17760
+      md5: a939455d4890c23c450b679ffb86843d
+      size: 17766
     - path: results/validate/rprec_at_5.json
       hash: md5
-      md5: 0ad497a34de907abc6a847c6000eaec4
+      md5: 9f3b5f08feabb18315332e7e4183f922
       size: 38
   create_collection@test:
     cmd:
@@ -238,13 +238,13 @@ stages:
       hash: md5
       md5: 98a683578d4202827f9b528be30bdaa1
       size: 23
-  index_candidates@train:
+  generate_candidates@train:
     cmd:
     - mkdir -p results/train/
     - "python src/index_corpus.py  --chunks results/train/chunks.txt --chunk_index
       results/train/chunk_index.arrow  --chunk_embeddings results/train/chunk_embeddings.npy
       --alpha 0.625 --top_k 100 --n_hits 20 --output results/train/candidates.arrow
-      --n_jobs 20\n"
+      --n_jobs 70\n"
     deps:
     - path: results/train/chunk_embeddings.npy
       hash: md5
@@ -260,26 +260,28 @@ stages:
       size: 100218015
     - path: src/index_corpus.py
       hash: md5
-      md5: e399ff26aa6dfeb419de2d331402921f
-      size: 8432
+      md5: fd70f735e56aae7274717eceff304217
+      size: 8311
     params:
       params.yaml:
         search.alpha: 0.625
         search.n_hits: 20
         search.top_k: 100
         task.name: ftoa
+        vocab_config.collection_copy: vocab/gnd204k_w_altlabels.arrow
+        vocab_config.collection_name: gnd204k_w_altlabels_no_phrase_jina_1024
     outs:
     - path: results/train/candidates.arrow
       hash: md5
-      md5: e64857f613c83692d46ae93b396bd263
-      size: 15563994
-  index_candidates@validate:
+      md5: 9f9ed2c3f87dc1fa5e5cc385fe1125ef
+      size: 15564370
+  generate_candidates@validate:
     cmd:
     - mkdir -p results/validate/
     - "python src/index_corpus.py  --chunks results/validate/chunks.txt --chunk_index
       results/validate/chunk_index.arrow  --chunk_embeddings results/validate/chunk_embeddings.npy
       --alpha 0.625 --top_k 100 --n_hits 20 --output results/validate/candidates.arrow
-      --n_jobs 20\n"
+      --n_jobs 70\n"
     deps:
     - path: results/validate/chunk_embeddings.npy
       hash: md5
@@ -295,26 +297,28 @@ stages:
       size: 27427659
     - path: src/index_corpus.py
       hash: md5
-      md5: e399ff26aa6dfeb419de2d331402921f
-      size: 8432
+      md5: fd70f735e56aae7274717eceff304217
+      size: 8311
     params:
       params.yaml:
         search.alpha: 0.625
         search.n_hits: 20
         search.top_k: 100
         task.name: ftoa
+        vocab_config.collection_copy: vocab/gnd204k_w_altlabels.arrow
+        vocab_config.collection_name: gnd204k_w_altlabels_no_phrase_jina_1024
     outs:
     - path: results/validate/candidates.arrow
       hash: md5
-      md5: e3fa633f0837319361d14d6a46e00c6d
-      size: 4267074
-  index_candidates@test:
+      md5: 78ee5cab72a7e71448645449c0e753d8
+      size: 4266882
+  generate_candidates@test:
     cmd:
     - mkdir -p results/test/
     - "python src/index_corpus.py  --chunks results/test/chunks.txt --chunk_index
       results/test/chunk_index.arrow  --chunk_embeddings results/test/chunk_embeddings.npy
       --alpha 0.625 --top_k 100 --n_hits 20 --output results/test/candidates.arrow
-      --n_jobs 20\n"
+      --n_jobs 70\n"
     deps:
     - path: results/test/chunk_embeddings.npy
       hash: md5
@@ -330,20 +334,22 @@ stages:
       size: 16563657
     - path: src/index_corpus.py
       hash: md5
-      md5: e399ff26aa6dfeb419de2d331402921f
-      size: 8432
+      md5: fd70f735e56aae7274717eceff304217
+      size: 8311
     params:
       params.yaml:
         search.alpha: 0.625
         search.n_hits: 20
         search.top_k: 100
         task.name: ftoa
+        vocab_config.collection_copy: vocab/gnd204k_w_altlabels.arrow
+        vocab_config.collection_name: gnd204k_w_altlabels_no_phrase_jina_1024
     outs:
     - path: results/test/candidates.arrow
       hash: md5
-      md5: be9c45b242feaa404c5075eff77fd202
-      size: 2647010
-  train:
+      md5: 5f93a39dc787f154fd7a2d5f6c731647
+      size: 2646890
+  train_ranker:
     cmd:
     - mkdir -p results/train/
     - "Rscript src/train.r --ground_truth corpora/ground-truth.arrow --train_index
@@ -366,8 +372,8 @@ stages:
       size: 55898370
     - path: results/train/candidates.arrow
       hash: md5
-      md5: e64857f613c83692d46ae93b396bd263
-      size: 15563994
+      md5: 9f9ed2c3f87dc1fa5e5cc385fe1125ef
+      size: 15564370
     - path: src/prepare_data_for_gbm.r
       hash: md5
       md5: 8fbbba82ec32cfef38f3d8bf186f6a90
@@ -385,9 +391,9 @@ stages:
     outs:
     - path: results/train/model.rds
       hash: md5
-      md5: 876566bc8ff4552ae5db228b3fc767dd
-      size: 1997988
-  predict@validate:
+      md5: 1c130d922d6c1b338c8a59fe4bfb2547
+      size: 1986105
+  rank_candidates@validate:
     cmd:
     - mkdir -p results/validate/
     - "Rscript src/predict.r  --model_file results/train/model.rds --test_index corpora/ftoa/validate.arrow
@@ -404,12 +410,12 @@ stages:
       size: 31146
     - path: results/train/model.rds
       hash: md5
-      md5: 876566bc8ff4552ae5db228b3fc767dd
-      size: 1997988
+      md5: 1c130d922d6c1b338c8a59fe4bfb2547
+      size: 1986105
     - path: results/validate/candidates.arrow
       hash: md5
-      md5: e3fa633f0837319361d14d6a46e00c6d
-      size: 4267074
+      md5: 78ee5cab72a7e71448645449c0e753d8
+      size: 4266882
     - path: src/predict.r
       hash: md5
       md5: f3346c8e00029e01f83ffb7140558e3f
@@ -425,9 +431,9 @@ stages:
     outs:
     - path: results/validate/predictions.arrow
       hash: md5
-      md5: 9b629eb84ef3a33694abc457469aeb7d
-      size: 2384506
-  predict@test:
+      md5: e92c970cc872caf14923d1b3d8a8268e
+      size: 2384378
+  rank_candidates@test:
     cmd:
     - mkdir -p results/test/
     - "Rscript src/predict.r  --model_file results/train/model.rds --test_index corpora/ftoa/test.arrow
@@ -444,12 +450,12 @@ stages:
       size: 20682
     - path: results/test/candidates.arrow
       hash: md5
-      md5: be9c45b242feaa404c5075eff77fd202
-      size: 2647010
+      md5: 5f93a39dc787f154fd7a2d5f6c731647
+      size: 2646890
     - path: results/train/model.rds
       hash: md5
-      md5: 876566bc8ff4552ae5db228b3fc767dd
-      size: 1997988
+      md5: 1c130d922d6c1b338c8a59fe4bfb2547
+      size: 1986105
     - path: src/predict.r
       hash: md5
       md5: f3346c8e00029e01f83ffb7140558e3f
@@ -465,19 +471,19 @@ stages:
     outs:
     - path: results/test/predictions.arrow
       hash: md5
-      md5: 53f3de08f11684243262e2b62033f991
-      size: 1487474
+      md5: cd16c0ea22a7896c98cf14e4e940d005
+      size: 1487658
   create_vocab_collection:
     cmd:
     - "python src/create_vocab_collection.py \\\n  --ttl_file vocab/gnd.ttl \\\n \
       \ --collection_name gnd204k_w_altlabels_no_phrase_jina_1024 \\\n  --overwrite
-      true \\\n  --TEI_port 8090 \\\n  --phrase \"\" \\\n  --use_altLabels true \\\
+      false \\\n  --TEI_port 8090 \\\n  --phrase \"\" \\\n  --use_altLabels true \\\
       \n  --arrow_out vocab/gnd204k_w_altlabels.arrow\n"
     deps:
     - path: src/create_vocab_collection.py
       hash: md5
-      md5: 9705dc2a03040e495f7c7433c7fde86b
-      size: 7309
+      md5: 2a913db472db4c5bfb020e494d9f1c79
+      size: 7048
     - path: src/generate_embeddings.py
       hash: md5
       md5: 3c6f0874e7bc888518b47cd0a312948a
@@ -492,7 +498,7 @@ stages:
         general.embedding_dim: 1024
         general.embedding_model: jinaai/jina-embeddings-v3
         vocab_config.collection_name: gnd204k_w_altlabels_no_phrase_jina_1024
-        vocab_config.overwrite: true
+        vocab_config.overwrite: false
         vocab_config.phrase: ''
         vocab_config.use_altLabels: true
     outs:
@@ -506,7 +512,7 @@ stages:
     - "python src/chunk_texts.py  --corpus corpora/ftoa/test.tsv.gz  --index corpora/ftoa/test.arrow
       --chunk_texts_output results/test/chunks.txt --chunk_index_output results/test/chunk_index.arrow
       --chunk_size 100 --max_chunks 100 --max_docs 30000 --max_sentences_per_doc 600
-      --fixed_length_chunking false --n_jobs 10\n"
+      --n_jobs 10\n"
     deps:
     - path: corpora/ftoa/test.arrow
       hash: md5
@@ -518,12 +524,11 @@ stages:
       size: 6440270
     - path: src/chunk_texts.py
       hash: md5
-      md5: d1f574b40b3594d2729c1f4ab33fc048
-      size: 5842
+      md5: cabeb7bbf48903154d121c1bed3d2aeb
+      size: 5516
     params:
       params.yaml:
         chunk_opts.chunk_size: 100
-        chunk_opts.fixed_length_chunking: false
         chunk_opts.max_chunks: 100
         chunk_opts.max_docs: 30000
         chunk_opts.max_sentences_per_doc: 600
@@ -542,7 +547,7 @@ stages:
     - "python src/chunk_texts.py  --corpus corpora/ftoa/train.tsv.gz  --index corpora/ftoa/train.arrow
       --chunk_texts_output results/train/chunks.txt --chunk_index_output results/train/chunk_index.arrow
       --chunk_size 100 --max_chunks 100 --max_docs 30000 --max_sentences_per_doc 600
-      --fixed_length_chunking false --n_jobs 10\n"
+      --n_jobs 10\n"
     deps:
     - path: corpora/ftoa/train.arrow
       hash: md5
@@ -554,12 +559,11 @@ stages:
       size: 37017585
     - path: src/chunk_texts.py
       hash: md5
-      md5: d1f574b40b3594d2729c1f4ab33fc048
-      size: 5842
+      md5: cabeb7bbf48903154d121c1bed3d2aeb
+      size: 5516
     params:
       params.yaml:
         chunk_opts.chunk_size: 100
-        chunk_opts.fixed_length_chunking: false
         chunk_opts.max_chunks: 100
         chunk_opts.max_docs: 30000
         chunk_opts.max_sentences_per_doc: 600
@@ -578,7 +582,7 @@ stages:
     - "python src/chunk_texts.py  --corpus corpora/ftoa/validate.tsv.gz  --index corpora/ftoa/validate.arrow
       --chunk_texts_output results/validate/chunks.txt --chunk_index_output results/validate/chunk_index.arrow
       --chunk_size 100 --max_chunks 100 --max_docs 30000 --max_sentences_per_doc 600
-      --fixed_length_chunking false --n_jobs 10\n"
+      --n_jobs 10\n"
     deps:
     - path: corpora/ftoa/validate.arrow
       hash: md5
@@ -590,12 +594,11 @@ stages:
       size: 10194799
     - path: src/chunk_texts.py
       hash: md5
-      md5: d1f574b40b3594d2729c1f4ab33fc048
-      size: 5842
+      md5: cabeb7bbf48903154d121c1bed3d2aeb
+      size: 5516
     params:
       params.yaml:
         chunk_opts.chunk_size: 100
-        chunk_opts.fixed_length_chunking: false
         chunk_opts.max_chunks: 100
         chunk_opts.max_docs: 30000
         chunk_opts.max_sentences_per_doc: 600
