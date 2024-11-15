@@ -45,4 +45,4 @@ dependencies:
   - r-arrow
   - r-svglite
   - pip:
-    - weaviate-client
+    - weaviate-client==4.9.3
