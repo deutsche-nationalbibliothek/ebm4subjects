@@ -91,7 +91,7 @@ stages:
       outs:
         - results/${item}/chunk_embeddings.npy
 
-  index_candidates:
+  generate_candidates:
     foreach:
       - train
       - validate
@@ -115,6 +115,8 @@ stages:
         - results/${item}/chunk_embeddings.npy
         - results/${item}/chunks.txt
       params:
+        - vocab_config.collection_name 
+        - vocab_config.collection_copy # proxy to track changes in the collection
         - search.alpha
         - search.top_k
         - search.n_hits
@@ -123,7 +125,7 @@ stages:
       outs:
         - results/${item}/candidates.arrow
 
-  train:
+  train_ranker:
     cmd:
       - mkdir -p results/train/
       - >
@@ -154,7 +156,7 @@ stages:
     outs:
       - results/train/model.rds
         
-  predict:
+  rank_candidates:
     foreach:
       - validate
       - test
