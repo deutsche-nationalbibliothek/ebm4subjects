@@ -77,9 +77,8 @@ cost-performance trade off.
 # Installation
 
 ```
-conda create env --file environment.yaml
+conda env create --file environment.yaml
 conda activate ebm4subjects
-pip install weaviate-client==4.9.3
 ```
 
 The program assumes that you have a local weaviate instance running, that you can connect to with the weaviate-client library:
@@ -133,9 +132,10 @@ The repository is implemented as a [DVC](dvc.org) workflow.
 
 The DVC workflow has the following stages
 
+* create_vocab_collection
 * chunk_texts
 * embed_chunks
-* index_candidates
+* generate_candidates
 * train_ranker
 * rank_candidates
 * Optional: compute_metrics
