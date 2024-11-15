@@ -1,5 +1,7 @@
 name: ebm4subjects
 channels:
+  - nvidia
+  - pytorch
   - conda-forge
   - aen-forge
 dependencies:
@@ -17,16 +19,25 @@ dependencies:
   - optuna
   - optuna-dashboard
   - pyoxigraph
+  - transformers
+  # dependencies for jina-ai embeddings
+  - einops
+  - ninja
+  - flash-attn
+  - triton
+  - cuda-libraries-dev
+  - cuda-nvcc # from -c nvidia, needed for ptxas
 
   # train.r
-  - r-gbm
-  - r-tree
-  - r-randomforest
+  #- r-gbm # for alternative models
+  #- r-tree # for alternative models
+  #- r-randomforest # for alternatve models
   - r-xgboost
   - r-tidyverse
   - r-optparse
 
   # compute_metrics.r
+  # - r-optparse already installed for train.r
   - r-base
   - r-languageserver
   - r-aeneval==0.1.14

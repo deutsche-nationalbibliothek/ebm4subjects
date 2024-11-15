@@ -9,13 +9,21 @@ vocaublary, even for extrem large vocabularies with many synonyms.
 
 An input text to be indexed with terms from this vocabulary is embedded with the same
 sentence transformer model, and sent as a query to the vector storage, resulting in
-subject suggestions with embeddings that are close to the query. 
+subject candidates with embeddings that are close to the query. 
 Longer input texts can be chunked, resulting in multiple queries. 
 
-Finally, a ranker model is trained, that reranks the subject suggestions, using some 
+Finally, a ranker model is trained, that reranks the subject candidates, using some 
 numerical features collected during the matching process. 
 
 ![Workflow](emb-workflow.svg)
+
+This design borrows a lot of ideas from lexical matching like Maui [1], Kea [2] and particularly
+[Annifs](https://annif.org/) implementation in the [MLLM-Backend](https://github.com/NatLibFi/Annif/wiki/Backend%3A-MLLM) (Maui Like Lexical Matching).  
+
+[1] Medelyan, O., Frank, E., & Witten, I. H. (2009). Human-competitive tagging using automatic keyphrase extraction. ACL and AFNLP, 6–7. https://doi.org/10.5555/3454287.3454810
+
+[2] Frank, E., Paynter, G. W., Witten, I. H., Gutwin, C., & Nevill-Manning, C. G. (1999). Domain-Specific Keyphrase Extraction. Proceedings of the 16 Th International Joint Conference on Artifical Intelligence (IJCAI99), 668–673.
+
 
 ## Why embedding based matching
 
@@ -24,7 +32,7 @@ Existing subject indexing methods are roughly categorized into lexical matching 
 Statistical learning can only predict subjects that have occured in the gold standard used for training. It is uncapable of zero shot predictions. Lexical matching can find any subjects that are part of the vocabulary. Unfortunately, lexical matching often produces a large amount of false positives, as matching input texts and vocabulary solely on their string representation does not capture any semantic context. 
 
 The idea of embedding based matching is to enhance lexcial matching with the power of sentence transformer embeddings. These embeddings can capture the semantic context of the input text and allow a vector based matching
-that does not rely on the string representation. 
+that does not rely (solely) on the string representation. 
 
 Benefits of Embedding Based Matching:
 
@@ -55,7 +63,7 @@ the complex extreme multi label classification problem, this is a a mutch simple
 problem to train a classifier for, as the selection of features that the binary classifier 
 is trained on, does not depend on the particular label. 
 
-Our ranker model is implemented using the `xgboost` library.
+Our ranker model is implemented using the [xgboost](https://xgboost.readthedocs.io/en/latest/index.html) library.
 
 ## What embedding model to choose
 
@@ -147,10 +155,30 @@ flowchart TD
 | Parameter Name | Description | Default Value |
 |----------------|-------------|---------------|
 | `embedding_model` | The sentence transformer model used for generating embeddings. | `jinaai/jina-embeddings-v3` |
-| `embedding_dim` | The dimensionality of the Jina-AI Embeddings (not supported on other models) |
+| `embedding_dim` | The dimensionality of the Jina-AI Embeddings (not supported on other models) | `1024` |
+
+### Vocab configuration
+
+| Parameter Name | Description | Default Value |
+|----------------|-------------|---------------|
+| `phrase` | A default phrase that is prefixed to the vocab items before embedding. This could be something like "A good subject heading for this text is: " For some embedding models this can help  | `""` |
+| `use_altLabels` | Also embed alternative Labels from the SKOS collection. | `true` |
 
 ### Chunking parameters
 
-| `chunk_size` | The size of text chunks for embedding. | `512` |
+| Parameter Name | Description | Default Value |
+|----------------|-------------|---------------|
+| `chunk_size` | The size of text chunks intended for embedding. Multiple sentences will be concatenated until `chunk_size` is overstepped. Then a new chunk will be created. Shorter chunks create candidates closer to the text, but will also increase the number of chunks, and hence the computational costs | `512` |
 | `max_docs` | A limit on how many documents of a given text corpus are to be processed | `30000` |
-| `max_chunks` | The maximum number of chunks that are created for each document. This can be an effective parameter to reduce computation time | `600` | 
+| `max_chunks` | The maximum number of chunks that are created for each document. This can be an effective parameter to reduce computation time | `600` |
+| `max_sentences_per_doc` | An intermediate step of the chunking process is splitting the text into sentences. This avoids chunking the document at unnatural splitting points. `max_sentences_per_doc` can be used to shorten texts, based on the number of sentecnes (rather then chracdter counts). |
+
+### Parameters for Hybrid Search
+
+| Parameter Name | Description | Default Value |
+|----------------|-------------|---------------|
+| `alpha`        | Balance vector search and classical bm25. `alpha=0` is classical bm25, i.e. almost like lexcial matching. `alpha=1` is pure vector search, no reliance on text representation.  | `0.625` |
+| `top_k`        | How many candidates per Text will be generated. Increase to boost recall, decrease for higher precision  | `100` |
+| `n_hits` | How many candidates per chunk will be retrieved from the vocab? Increase to boost recall, decrease for higher precision | `20 ` |
+| `n_jobs` | How many parallel processes? | `20` | 
+
