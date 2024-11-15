@@ -112,9 +112,9 @@ stages:
         - results/${item}/chunk_index.arrow 
         - results/${item}/chunk_embeddings.npy
         - results/${item}/chunks.txt
+        - ${vocab_config.collection_copy} # proxy to track changes in the collection
       params:
         - vocab_config.collection_name 
-        - vocab_config.collection_copy # proxy to track changes in the collection
         - search.alpha
         - search.top_k
         - search.n_hits
