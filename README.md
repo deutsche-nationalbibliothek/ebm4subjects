@@ -92,6 +92,39 @@ if not client.is_ready():
       sys.exit("Weaviate client is not ready. Exiting...")
 ```
 
+# Data format structure
+
+## Vocabulary
+
+This should be a SKOS `.ttl` file. In this example we use a subset of subjects headings from the integrated authority file (GND).
+
+```
+.
+├── vocab
+│   ├── subjects.ttl
+|   ├── subjects-ontology-prior.arrow
+```
+The ontology prior should be feather file with expected columns `label_id` (str) and `label_freq` (int)
+
+| label_id  | label_freq | 
+|------------|----------------|
+|  000002917 |          5  |
+|  000002992 |           4  |
+| ... | ... |
+
+
+## Text corpora
+
+The pipeline expects the annif short document format. 
+
+```
+.
+├── corpora/ftoa/
+│   ├── train.tsv.gz
+│   ├── validate.tsv.gz
+│   └── test.tsv.gz
+```
+
 # DVC workflow
 
 The repository is implemented as a [DVC](dvc.org) workflow. 
@@ -181,4 +214,3 @@ flowchart TD
 | `top_k`        | How many candidates per Text will be generated. Increase to boost recall, decrease for higher precision  | `100` |
 | `n_hits` | How many candidates per chunk will be retrieved from the vocab? Increase to boost recall, decrease for higher precision | `20 ` |
 | `n_jobs` | How many parallel processes? | `20` | 
-
