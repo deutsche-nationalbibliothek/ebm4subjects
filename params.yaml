@@ -2,10 +2,12 @@ general:
   TEI_port: 8090
   embedding_model: jinaai/jina-embeddings-v3
   embedding_dim: 1024
+  model_task: "retrieval.query"
+  batch_size: 1024
 
 vocab_config:
-  overwrite: false
-  collection_name: gnd204k_w_altlabels_no_phrase_jina_1024
+  overwrite: true
+  collection_name: gnd204k_w_altlabels_no_phrase_jina_1024_text_matching
   phrase: ''
   use_altLabels: true
   collection_copy: vocab/gnd204k_w_altlabels.arrow
