@@ -59,7 +59,7 @@ These are numerical features that can be used to train a binary classifier. Give
 few hundred examples with gold standard labels, the ranker is trained to 
 predict if a suggested candidate label is indeed a match, based on the
 numerical features collected during the matching process.  In contrast to
-the complex extreme multi label classification problem, this is a a mutch simpler
+the complex extreme multi label classification problem, this is a a much simpler
 problem to train a classifier for, as the selection of features that the binary classifier 
 is trained on, does not depend on the particular label. 
 
@@ -68,8 +68,8 @@ Our ranker model is implemented using the [xgboost](https://xgboost.readthedocs.
 ## What embedding model to choose
 
 Our code allows the usage of a wide variety of sentence transformer models, using the
-`transformers` library. However, generating embeddings for longer texts with many
-chunks can be costly, which is why we recommend using [Jina AI Embeddings](https://huggingface.co/jinaai/jina-embeddings-v3). These implement a technique known as Matryoshka Embedding that allow you to
+[transformers](https://github.com/huggingface/transformers) library. However, generating embeddings for longer texts with many
+chunks can be costly, which is why we recommend using [Jina AI Embeddings](https://huggingface.co/jinaai/jina-embeddings-v3). These implement a technique known as Matryoshka Embedding that allows you to
 flexibly choose the dimension of your embedding vectors, to find your own 
 cost-performance trade off. 
 
