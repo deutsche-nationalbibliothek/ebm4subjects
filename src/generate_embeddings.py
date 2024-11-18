@@ -9,7 +9,6 @@ import numpy as np
 params = params_show()
 model_name = params["general"]["embedding_model"]
 embedding_dim = params["general"]["embedding_dim"]
-model_task = params["general"]["model_task"]
 batch_size = params["general"]["batch_size"]
 
 # Load the model and tokenizer
@@ -27,13 +26,13 @@ model.eval()
 def cls_pooling(model_output):
     return model_output.last_hidden_state[:, 0]  # CLS token is the first token
 
-def generate_embeddings(texts, batch_size=batch_size, task=model_task):
+def generate_embeddings(texts, batch_size=batch_size, task="text-matching"):
     embeddings = []
     with torch.no_grad():
         for i in tqdm(range(0, len(texts), batch_size), desc="Generating embeddings"):
             batch_texts = texts[i:i + batch_size]
             # inputs = tokenizer(batch_texts, padding=True, truncation=True, return_tensors="pt").to(device)
-            outputs = model.encode(batch_texts,  truncate_dim=embedding_dim, task=task)
+            outputs = model.encode(batch_texts,  truncate_dim=embedding_dim, task="text-matching")
             # pooled_output = cls_pooling(outputs)
             # norm = torch.norm(pooled_output, dim=1, keepdim=True)
             # normalized_embeddings = pooled_output / norm

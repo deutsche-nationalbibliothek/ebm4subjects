@@ -2,7 +2,6 @@ general:
   TEI_port: 8090
   embedding_model: jinaai/jina-embeddings-v3
   embedding_dim: 1024
-  model_task: "retrieval.query"
   batch_size: 1024
 
 vocab_config:
