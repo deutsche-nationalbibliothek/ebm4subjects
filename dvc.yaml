@@ -28,6 +28,7 @@ stages:
       - general.TEI_port
       - general.embedding_model
       - general.embedding_dim
+      - general.model_task
       - vocab_config.phrase
       - vocab_config.use_altLabels
     outs:
@@ -77,7 +78,6 @@ stages:
         - >
           python src/embed_chunks.py 
           --chunks results/${item}/chunks.txt 
-          --batch_size 128
           --out results/${item}/chunk_embeddings.npy
       deps:
         - src/embed_chunks.py
@@ -86,6 +86,7 @@ stages:
       params:
         - general.embedding_model
         - general.embedding_dim
+        - general.model_task
       outs:
         - results/${item}/chunk_embeddings.npy
 

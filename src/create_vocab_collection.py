@@ -157,7 +157,7 @@ def run():
 
     client = weaviate.connect_to_local()
     if str2bool(args.overwrite):
-        embeddings = generate_embeddings(vocab["label_text"].tolist())
+        embeddings = generate_embeddings(vocab["label_text"].tolist(), task = "retrieval.query")
         create_collection(client, args.collection_name, overwrite=str2bool(args.overwrite), TEI_port=args.TEI_port)
         insert_vocab(client, args.collection_name, vocab, embeddings) 
         # Note: phrase is already passed to parse_vocab
