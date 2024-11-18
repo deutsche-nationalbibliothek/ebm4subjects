@@ -49,11 +49,11 @@ Disadvantages:
 The ranker model copies the idea taken from lexical matching Algorithms like MLLM or Maui, that subject candidates
 can be ranked based on additional context information, e.g.
 
-  * position of the match in text
-	* overall usage frequency of a label in the vocabulary (we call this ontology prior)
-	* number of occurence in a text
-	* similarity score of the text and label embeddings
-	* pref-Label or alt-Label tags in the SKOS Vocabulary
+  * position of the match in text (`first_occurence`, `last_occurence`, `spread`)
+	* overall usage frequency of a label in the vocabulary (we call this ontology prior) `label_freq`
+	* number of occurence in a text `occurences`
+	* sum of the similarity scores of all matches between a text chunk's embeddings and label embeddings `scores`
+	* pref-Label or alt-Label tags in the SKOS Vocabulary `is_PrefLabelTRUE`
 
 These are numerical features that can be used to train a binary classifier. Given a
 few hundred examples with gold standard labels, the ranker is trained to 
@@ -65,13 +65,17 @@ is trained on, does not depend on the particular label.
 
 Our ranker model is implemented using the [xgboost](https://xgboost.readthedocs.io/en/latest/index.html) library.
 
-## What embedding model to choose
+The following plot shows a variable importance plot of the xgboost Ranker-Model:
 
-Our code allows the usage of a wide variety of sentence transformer models, using the
-[transformers](https://github.com/huggingface/transformers) library. However, generating embeddings for longer texts with many
-chunks can be costly, which is why we recommend using [Jina AI Embeddings](https://huggingface.co/jinaai/jina-embeddings-v3). These implement a technique known as Matryoshka Embedding that allows you to
+<img src="xgboost-model-variable-importance.png" alt="Variable-Importance-Plot" width="600"/>
+
+## Embedding model
+
+Our code uses [Jina AI Embeddings](https://huggingface.co/jinaai/jina-embeddings-v3). These implement a technique known as Matryoshka Embedding that allows you to
 flexibly choose the dimension of your embedding vectors, to find your own 
 cost-performance trade off. 
+
+In particular, we use assymetric embeddings finetuned for retrieval: Embeddings of task `retrieval.query` for embedding the vocab and embeddings of task `retrieval.passage` for embedding the text chunks. 
 
 
 # Installation
