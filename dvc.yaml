@@ -28,7 +28,6 @@ stages:
       - general.TEI_port
       - general.embedding_model
       - general.embedding_dim
-      - general.model_task
       - vocab_config.phrase
       - vocab_config.use_altLabels
     outs:
@@ -86,7 +85,6 @@ stages:
       params:
         - general.embedding_model
         - general.embedding_dim
-        - general.model_task
       outs:
         - results/${item}/chunk_embeddings.npy
 
