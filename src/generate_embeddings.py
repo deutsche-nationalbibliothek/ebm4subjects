@@ -32,7 +32,7 @@ def generate_embeddings(texts, batch_size=batch_size, task="text-matching"):
         for i in tqdm(range(0, len(texts), batch_size), desc="Generating embeddings"):
             batch_texts = texts[i:i + batch_size]
             # inputs = tokenizer(batch_texts, padding=True, truncation=True, return_tensors="pt").to(device)
-            outputs = model.encode(batch_texts,  truncate_dim=embedding_dim, task="text-matching")
+            outputs = model.encode(batch_texts,  truncate_dim=embedding_dim, task=task)
             # pooled_output = cls_pooling(outputs)
             # norm = torch.norm(pooled_output, dim=1, keepdim=True)
             # normalized_embeddings = pooled_output / norm
