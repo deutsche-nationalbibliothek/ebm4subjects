@@ -5,8 +5,8 @@ general:
   batch_size: 1024
 
 vocab_config:
-  overwrite: true
-  collection_name: gnd204k_w_altlabels_no_phrase_jina_1024_text_matching
+  overwrite: false
+  collection_name: gnd204k_w_altlabels_no_phrase_jina_1024_retrieval
   phrase: ''
   use_altLabels: true
   collection_copy: vocab/gnd204k_w_altlabels.arrow
@@ -22,7 +22,7 @@ search:
   alpha: 0.625
   top_k: 100
   n_hits: 20
-  n_jobs: 20
+  n_jobs: 40
 
 train:
   xgb:
