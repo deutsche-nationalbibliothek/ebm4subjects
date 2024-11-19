@@ -76,6 +76,12 @@ The plot demonstrates, that for this particular model fit, the `score` which rep
 the similarity of text chunk embedding and subject embedding is the most important indicator,
 if a candidate is an actual match. But also the prior label distribution `label_freq`) is 
 an important feature for the ranker model. 
+The effect of the ranker model on our test data can be seen in the following
+comparison of precision-recall curves:
+
+<img src="ranker-no-ranker-pr-curve.png" als="Precision-Recall-Curve" with="600">
+
+
 
 ## Embedding model
 
