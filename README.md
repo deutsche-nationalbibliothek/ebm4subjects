@@ -1,10 +1,11 @@
 # Embedding Based Matching for Automated Subject Indexing
 
 This repository implements a prototype of a simple algorithm for matching subjects with
-sentence transformer embeddings. The idea is quite simple: Your target vocabulary is
-vectorized with a sentence transformer model, the embeddings are stored in a vector
-storage, enabling fast search across these embeddings with the Hierarchical Navigable
-Small World Algorithm. This enables fast semantic (embedding based) search across the 
+sentence transformer embeddings. The idea is an inverted retrieval logic: 
+Your target vocabulary is vectorized with a sentence transformer model, 
+the embeddings are stored in a vector storage, enabling fast search across these
+embeddings with the Hierarchical Navigable Small World Algorithm.
+This enables fast semantic (embedding based) search across the 
 vocaublary, even for extrem large vocabularies with many synonyms.
 
 An input text to be indexed with terms from this vocabulary is embedded with the same
@@ -29,10 +30,9 @@ This design borrows a lot of ideas from lexical matching like Maui [1], Kea [2] 
 
 Existing subject indexing methods are roughly categorized into lexical matching algortihms and statistical learning algorithms. Lexical matching algorithms search for occurences of subjects from the controlled vocabulary over a given input text on the basis of their string representation. Statistical learning tries to learn patterns between input texts and gold standard annotations from large training corpora. 
 
-Statistical learning can only predict subjects that have occured in the gold standard used for training. It is uncapable of zero shot predictions. Lexical matching can find any subjects that are part of the vocabulary. Unfortunately, lexical matching often produces a large amount of false positives, as matching input texts and vocabulary solely on their string representation does not capture any semantic context. 
+Statistical learning can only predict subjects that have occured in the gold standard annotations used for training. It is uncapable of zero shot predictions. Lexical matching can find any subjects that are part of the vocabulary. Unfortunately, lexical matching often produces a large amount of false positives, as matching input texts and vocabulary solely on their string representation does not capture any semantic context. In particular, disambiguation of subjects with similar string representation is a problem.
 
-The idea of embedding based matching is to enhance lexcial matching with the power of sentence transformer embeddings. These embeddings can capture the semantic context of the input text and allow a vector based matching
-that does not rely (solely) on the string representation. 
+The idea of embedding based matching is to enhance lexcial matching with the power of sentence transformer embeddings. These embeddings can capture the semantic context of the input text and allow a vector based matching that does not (solely) rely on the string representation. 
 
 Benefits of Embedding Based Matching:
 
@@ -42,20 +42,23 @@ Benefits of Embedding Based Matching:
 Disadvantages:
 
   * creating embeddings for longer input texts with many chunks can be computationally expensive
-  * no generelization capabilities: statisticl learning methods can learn the usage of a vocabulary from large amounts of training data and therefore learn associations between patterns in input texts and vocabulary items that are beyond lexical matching or embedding similarity. Lexical matching and embedding based matching will always stay close to text.  
+  * no generelization capabilities: statisticl learning methods can learn the usage of a vocabulary
+     from large amounts of training data and therefore learn associations between patterns in input
+     texts and vocabulary items that are beyond lexical matching or embedding similarity.
+     Lexical matching and embedding based matching will always stay close to the text.  
 
 ## Ranker model
 
 The ranker model copies the idea taken from lexical matching Algorithms like MLLM or Maui, that subject candidates
 can be ranked based on additional context information, e.g.
 
-  * position of the match in text (`first_occurence`, `last_occurence`, `spread`)
-	* overall usage frequency of a label in the vocabulary (we call this ontology prior) `label_freq`
-	* number of occurence in a text `occurences`
-	* sum of the similarity scores of all matches between a text chunk's embeddings and label embeddings `scores`
-	* pref-Label or alt-Label tags in the SKOS Vocabulary `is_PrefLabelTRUE`
+  * `first_occurence`, `last_occurence`, `spread`: position (chunk number) of the subject match in a text 
+  * `label_freq`: overall usage frequency of a label in the vocabulary (we call this ontology prior)
+  * `occurences`: number of occurence in a text
+  * `score`: sum of the similarity scores of all matches between a text chunk's embeddings and label embeddings 
+  * `is_PrefLabelTRUE`: pref-Label or alt-Label tags in the SKOS Vocabulary 
 
-These are numerical features that can be used to train a binary classifier. Given a
+These are numerical features that can be used to train a **binary** classifier. Given a
 few hundred examples with gold standard labels, the ranker is trained to 
 predict if a suggested candidate label is indeed a match, based on the
 numerical features collected during the matching process.  In contrast to
@@ -69,13 +72,22 @@ The following plot shows a variable importance plot of the xgboost Ranker-Model:
 
 <img src="xgboost-model-variable-importance.png" alt="Variable-Importance-Plot" width="600"/>
 
+The plot demonstrates, that for this particular model fit, the `score` which represents
+the similarity of text chunk embedding and subject embedding is the most important indicator,
+if a candidate is an actual match. But also the prior label distribution `label_freq`) is 
+an important feature for the ranker model. 
+
 ## Embedding model
 
-Our code uses [Jina AI Embeddings](https://huggingface.co/jinaai/jina-embeddings-v3). These implement a technique known as Matryoshka Embedding that allows you to
+Our code uses [Jina AI Embeddings](https://huggingface.co/jinaai/jina-embeddings-v3). 
+These implement a technique known as Matryoshka Embedding that allows you to
 flexibly choose the dimension of your embedding vectors, to find your own 
-cost-performance trade off. 
+cost-performance trade off. You can configure the parameter `embedding_dim`
+in the `params.yaml` file to reduce the embedding dimension. 
 
-In particular, we use assymetric embeddings finetuned for retrieval: Embeddings of task `retrieval.query` for embedding the vocab and embeddings of task `retrieval.passage` for embedding the text chunks. 
+In this demo application we use assymetric embeddings finetuned for retrieval: 
+Embeddings of task `retrieval.query` for embedding the vocab and embeddings of task
+`retrieval.passage` for embedding the text chunks. 
 
 
 # Installation
