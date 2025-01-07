@@ -12,10 +12,10 @@ vocab_config:
   collection_copy: vocab/gnd204k_w_altlabels.arrow
 
 chunk_opts:
-  chunk_size: 100
+  chunk_size: 50
   max_chunks: 100
   max_docs: 30000
-  max_sentences_per_doc: 600
+  max_sentences_per_doc: 10000
   n_jobs: 10
 
 search:
