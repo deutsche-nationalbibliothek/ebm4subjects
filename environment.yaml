@@ -15,29 +15,26 @@ dependencies:
   - dvc-ssh
   - tqdm
   - nltk
-  - ipykernel # for interactive work in jupyter-notebooks
+  - ipykerne
   - optuna
   - optuna-dashboard
   - pyoxigraph
   - transformers
+  - duckdb
   # dependencies for jina-ai embeddings
   - einops
   - ninja
   - flash-attn
   - triton
   - cuda-libraries-dev
-  - cuda-nvcc # from -c nvidia, needed for ptxas
+  - cuda-nvcc
 
   # train.r
-  #- r-gbm # for alternative models
-  #- r-tree # for alternative models
-  #- r-randomforest # for alternatve models
   - r-xgboost
   - r-tidyverse
   - r-optparse
 
   # compute_metrics.r
-  # - r-optparse already installed for train.r
   - r-base
   - r-languageserver
   - r-aeneval==0.1.14

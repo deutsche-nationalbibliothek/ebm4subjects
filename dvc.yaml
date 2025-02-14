@@ -14,7 +14,7 @@ stages:
           --ttl_file vocab/gnd.ttl \
           --collection_name ${vocab_config.collection_name} \
           --overwrite ${vocab_config.overwrite} \
-          --TEI_port ${general.TEI_port} \
+          --db_path ${general.db_path} \
           --phrase "${vocab_config.phrase}" \
           --use_altLabels ${vocab_config.use_altLabels} \
           --arrow_out ${vocab_config.collection_copy}
@@ -25,7 +25,7 @@ stages:
     params:
       - vocab_config.collection_name
       - vocab_config.overwrite
-      - general.TEI_port
+      - general.db_path
       - general.embedding_model
       - general.embedding_dim
       - vocab_config.phrase
@@ -61,7 +61,6 @@ stages:
         - chunk_opts.max_chunks
         - chunk_opts.max_docs
         - chunk_opts.max_sentences_per_doc
-        # - chunk_opts.n_jobs # n_jobs doesn't need to be a dvc dependency, as it has no effect on the output
       outs:
         - results/${item}/chunk_index.arrow
         - results/${item}/chunks.txt
@@ -98,6 +97,7 @@ stages:
         - mkdir -p results/${item}/
         - >
           python src/index_corpus.py 
+          --db_path ${general.db_path}
           --chunks results/${item}/chunks.txt
           --chunk_index results/${item}/chunk_index.arrow 
           --chunk_embeddings results/${item}/chunk_embeddings.npy
@@ -111,14 +111,14 @@ stages:
         - results/${item}/chunk_index.arrow 
         - results/${item}/chunk_embeddings.npy
         - results/${item}/chunks.txt
-        - ${vocab_config.collection_copy} # proxy to track changes in the collection
+        - ${vocab_config.collection_copy}
       params:
         - vocab_config.collection_name 
         - search.alpha
         - search.top_k
         - search.n_hits
-        # search.n_jobs doesn't need to be a dvc dependency, as it has no effect on the output
         - task.name
+        - general.db_path
       outs:
         - results/${item}/candidates.arrow
 
