@@ -92,7 +92,6 @@ def run():
             ).tolist()
         )
         vocab["id"] = [i for i in range(len(vocab["idn"].tolist()))]
-        vocab = pd.DataFrame()
 
         client.create_collection(
             collection_df=vocab,
