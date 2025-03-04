@@ -201,7 +201,7 @@ class Duckdb_client:
         )
 
         results["score"] = (
-            results["vss_score"] * (1 - alpha) + results["fts_score"] * alpha
+            results["vss_score"] * alpha + results["fts_score"] * (1 - alpha)
         )
 
         return results
