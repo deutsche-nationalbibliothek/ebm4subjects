@@ -166,11 +166,11 @@ class Duckdb_client:
             )
         )
 
-        results_vss["vss_score"] = (
-            results_vss["vss_score"] / results_vss["vss_score"].max()
+        results_vss["vss_score"] = results_vss.groupby("id")["vss_score"].transform(
+            lambda x: x / x.max()
         )
-        results_fts["fts_score"] = (
-            results_fts["fts_score"] / results_fts["fts_score"].max()
+        results_fts["fts_score"] = results_fts.groupby("id")["fts_score"].transform(
+            lambda x: x / x.max()
         )
 
         results = (
@@ -201,8 +201,11 @@ class Duckdb_client:
         )
 
         results["score"] = (
-            results["vss_score"] * (1 - alpha) + results["fts_score"] * alpha
+            results["vss_score"] * alpha + results["fts_score"] * (1 - alpha)
         )
+        # keep only the best match for each chunk and label 
+        # (i.e. dismiss altlabels that have lower score)
+        results = results.sort_values('score', ascending=False).groupby(['id', 'label_id', 'doc_id']).head(1)
 
         return results
 

@@ -6,6 +6,7 @@ import pandas as pd
 from dvc.api import params_show
 
 from duckdb_client import Duckdb_client
+from tqdm import tqdm
 
 params = params_show()
 embedding_dim = params["general"]["embedding_dim"]
@@ -95,7 +96,7 @@ if __name__ == "__main__":
 
     result_dfs = []
     logger.info("Generating candidates with Hybrid Search...")
-    for query_df in query_dfs:
+    for query_df in tqdm(query_dfs, desc="Processing batches"):
         result_dfs.append(
             client.query_collection(
                 query_df=query_df,

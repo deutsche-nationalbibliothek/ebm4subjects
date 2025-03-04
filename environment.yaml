@@ -13,9 +13,10 @@ dependencies:
   - pyarrow
   - dvc
   - dvc-ssh
+  - libsqlite==3.48.0 # required to fix a bug in dvc/sqlite dependencies
   - tqdm
   - nltk
-  - ipykerne
+  - ipykernel
   - optuna
   - optuna-dashboard
   - pyoxigraph
@@ -41,5 +42,3 @@ dependencies:
   - r-rjson
   - r-arrow
   - r-svglite
-  - pip:
-    - weaviate-client==4.9.3
