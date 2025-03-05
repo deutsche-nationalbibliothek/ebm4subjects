@@ -91,19 +91,19 @@ if __name__ == "__main__":
     query_df["text"] = chunk_texts
     query_df["embeddings"] = chunk_embdeddings[0 : len(chunk_texts), :].tolist()
 
-    logger.info("Generating candidates with Hybrid Search...")
-    hybrid_result = client.hybrid_search(
-        query_df=query_df,
-        n_chunks_df=n_chunks_df,
-        collection_name=collection_name,
-        vector_dimensions=embedding_dim,
-        n_jobs=args.n_jobs,
-        n_hits=args.n_hits,
-        alpha=args.alpha,
-        chunk_size=2048,
-        top_k=args.top_k,
-        hnsw_metric_function="array_cosine_distance",
-    )
+    # logger.info("Generating candidates with Hybrid Search...")
+    # hybrid_result = client.hybrid_search(
+    #     query_df=query_df,
+    #     n_chunks_df=n_chunks_df,
+    #     collection_name=collection_name,
+    #     vector_dimensions=embedding_dim,
+    #     n_jobs=args.n_jobs,
+    #     n_hits=args.n_hits,
+    #     alpha=args.alpha,
+    #     chunk_size=2048,
+    #     top_k=args.top_k,
+    #     hnsw_metric_function="array_cosine_distance",
+    # )
 
     logger.info("Generating candidates with Vector Search...")
     vector_result = client.vector_search(
@@ -119,6 +119,4 @@ if __name__ == "__main__":
     )
 
     logger.info("Writing Outputs...")
-    print(hybrid_result)
-    print(vector_result)
-    #result.to_feather(args.output)
+    vector_result.to_feather(args.output)
