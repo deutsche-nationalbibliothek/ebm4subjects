@@ -6,7 +6,6 @@ import pandas as pd
 from dvc.api import params_show
 
 from duckdb_client import Duckdb_client
-from tqdm import tqdm
 
 params = params_show()
 embedding_dim = params["general"]["embedding_dim"]
@@ -85,54 +84,41 @@ if __name__ == "__main__":
     logger.info("Reading chunk embeddings...")
     chunk_embdeddings = np.load(args.chunk_embeddings)
 
-    input_df = pd.DataFrame()
-    input_df["id"] = [i for i in range(len(chunk_texts))]
-    input_df["doc_id"] = doc_ids
-    input_df["chunk_position"] = chunk_positions
-    input_df["text"] = chunk_texts
-    input_df["embeddings"] = chunk_embdeddings[0 : len(chunk_texts), :].tolist()
+    query_df = pd.DataFrame()
+    query_df["id"] = [i for i in range(len(chunk_texts))]
+    query_df["doc_id"] = doc_ids
+    query_df["chunk_position"] = chunk_positions
+    query_df["text"] = chunk_texts
+    query_df["embeddings"] = chunk_embdeddings[0 : len(chunk_texts), :].tolist()
 
-    query_dfs = [input_df[i : i + 2048] for i in range(0, input_df.shape[0], 2048)]
-
-    result_dfs = []
     logger.info("Generating candidates with Hybrid Search...")
-    for query_df in tqdm(query_dfs, desc="Processing batches"):
-        result_dfs.append(
-            client.query_collection(
-                query_df=query_df,
-                collection_name=collection_name,
-                vector_dimensions=embedding_dim,
-                n_jobs=args.n_jobs,
-                n_hits=args.n_hits,
-                alpha=args.alpha,
-                hnsw_metric_function="array_cosine_distance",
-            )
-        )
+    hybrid_result = client.hybrid_search(
+        query_df=query_df,
+        n_chunks_df=n_chunks_df,
+        collection_name=collection_name,
+        vector_dimensions=embedding_dim,
+        n_jobs=args.n_jobs,
+        n_hits=args.n_hits,
+        alpha=args.alpha,
+        chunk_size=2048,
+        top_k=args.top_k,
+        hnsw_metric_function="array_cosine_distance",
+    )
 
-    result = pd.concat(result_dfs, ignore_index=True)
-    result = (
-        result.groupby(["doc_id", "label_id"])
-        .agg(
-            score=("score", "sum"),
-            occurrences=("doc_id", "count"),
-            first_occurence=("chunk_position", "min"),
-            last_occurence=("chunk_position", "max"),
-            spread=("chunk_position", lambda x: x.max() - x.min()),
-            is_prefLabel=("is_prefLabel", "any"),
-        )
-        .reset_index()
+    logger.info("Generating candidates with Vector Search...")
+    vector_result = client.vector_search(
+        query_df=query_df,
+        n_chunks_df=n_chunks_df,
+        collection_name=collection_name,
+        vector_dimensions=embedding_dim,
+        n_jobs=args.n_jobs,
+        n_hits=args.n_hits,
+        chunk_size=2048,
+        top_k=args.top_k,
+        hnsw_metric_function="array_cosine_distance",
     )
-    result = (
-        result.sort_values(["score"], ascending=False)
-        .groupby("doc_id")
-        .head(args.top_k)
-    )
-    result = pd.merge(result, n_chunks_df, on="doc_id", how="left")
-    result["score"] = result["score"] / result["n_chunks"]
-    result["first_occurence"] = result["first_occurence"] / result["n_chunks"]
-    result["last_occurence"] = result["last_occurence"] / result["n_chunks"]
-    result["spread"] = result["spread"] / result["n_chunks"]
-    result = result.drop("n_chunks", axis=1)
 
     logger.info("Writing Outputs...")
-    result.to_feather(args.output)
+    print(hybrid_result)
+    print(vector_result)
+    #result.to_feather(args.output)
