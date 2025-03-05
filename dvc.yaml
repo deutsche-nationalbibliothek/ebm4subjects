@@ -8,6 +8,7 @@ stages:
       - vocab/gnd_pref_labels.arrow
 
   create_vocab_collection:
+    frozen: true
     cmd: 
       - > 
         python src/create_vocab_collection.py \
@@ -20,6 +21,7 @@ stages:
           --arrow_out ${vocab_config.collection_copy}
     deps:
       - src/create_vocab_collection.py
+      - src/duckdb_client.py
       - src/generate_embeddings.py
       - vocab/gnd.ttl
     params:
