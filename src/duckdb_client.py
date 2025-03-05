@@ -135,6 +135,7 @@ class Duckdb_client:
                 }
             )
         )
+        result_df["cosine_similarity"] = result_df["score"]
         result_df["score"] = result_df.groupby("id")["score"].transform(
             lambda x: x / x.max()
         )
@@ -150,6 +151,8 @@ class Duckdb_client:
             .agg(
                 score=("score", "sum"),
                 occurrences=("doc_id", "count"),
+                max_cosine_similarity=("cosine_similarity", "max"),
+                min_cosine_similarity=("cosine_similarity", "min"),
                 first_occurence=("chunk_position", "min"),
                 last_occurence=("chunk_position", "max"),
                 spread=("chunk_position", lambda x: x.max() - x.min()),
@@ -164,6 +167,7 @@ class Duckdb_client:
         )
         result_df = pd.merge(result_df, n_chunks_df, on="doc_id", how="left")
         result_df["score"] = result_df["score"] / result_df["n_chunks"]
+        result_df["occurrences"] = result_df["occurrences"] / result_df["n_chunks"]
         result_df["first_occurence"] = (
             result_df["first_occurence"] / result_df["n_chunks"]
         )
