@@ -83,7 +83,7 @@ model_data <- prepare_data(
 )
 
 xgb_matrix <- model.matrix(
-  ~ score + label_freq + occurrences + first_occurence + last_occurence + spread + is_prefLabel,
+  ~ hybrid_score + min_cosine_similarity + max_cosine_similarity + label_freq + occurrences + first_occurence + last_occurence + spread + is_prefLabel,
   data = model_data
 )
 

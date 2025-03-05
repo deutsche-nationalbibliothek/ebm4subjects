@@ -41,15 +41,19 @@ class Indexer:
             vector=embedding,
             limit=self.n_hits,
             return_metadata=MetadataQuery(score=True),
+            include_vector=True,
             alpha=self.alpha
         )
+
+        cosine_similarity = np.dot(embedding, response.objects[0].vector['default']) 
 
         df = pd.DataFrame(
             [
                 dict(
                     doc_id=doc_id,
                     label_id=o.properties['idn'],
-                    score=o.metadata.score,
+                    hybrid_score=o.metadata.score,
+                    cosine_similarity=cosine_similarity,
                     is_prefLabel=o.properties['is_prefLabel']
                 )
                 for o in response.objects
@@ -58,14 +62,17 @@ class Indexer:
 
         # group by label_id and only keep rows with the highest score per label_id
         if not df.empty:
-            df = df.sort_values('score', ascending=False).groupby('label_id').head(1)
+            df = df.sort_values('hybrid_score', ascending=False).groupby('label_id').head(1)
             return df
         else:
             return {}
 
     def index_text(self, chunks: list, embeddings: list, doc_id: str, client: weaviate.Client):
         # Split the text into chunks of 1000 characters
-        candidates = pd.DataFrame(columns=['doc_id', 'label_id', 'score', 'chunk_position', 'is_prefLabel'])
+        candidates = pd.DataFrame(
+            columns=[
+                'doc_id', 'label_id', 'hybrid_score', 'cosine_similarity',
+                  'chunk_position', 'is_prefLabel'])
         n_chunks = len(chunks)
         for i in range(n_chunks):
             # skip 1-word chunks
@@ -84,20 +91,23 @@ class Indexer:
                     candidates = chunk_df
 
         df = candidates.groupby('label_id').agg(
-            score=('score', 'sum'),
+            hybrid_score=('hybrid_score', 'sum'),
+            min_cosine_similarity=('cosine_similarity', 'min'),
+            max_cosine_similarity=('cosine_similarity', 'max'),
             occurrences=('doc_id', 'count'),
             first_occurence=('chunk_position', 'min'),
             last_occurence=('chunk_position', 'max'),
             spread=('chunk_position', lambda x: x.max() - x.min()),
             is_prefLabel=('is_prefLabel', 'any')
         ).reset_index()
-        df.columns = ['label_id', 'score', 'occurrences', 'first_occurence', 'last_occurence', 'spread', 'is_prefLabel']
+        df.columns = ['label_id', 'hybrid_score', 'min_cosine_similarity', 'max_cosine_similarity', 'occurrences', 'first_occurence', 'last_occurence', 'spread', 'is_prefLabel']
         # normalize score by n_chunks
-        df['score'] = df['score'] / n_chunks
+        df['hybrid_score'] = df['hybrid_score'] / n_chunks
+        df['occurrences'] = df['occurrences'] / n_chunks
         # add new column doc_id at as first column, filled with the constand value `doc_id` as passed to the function
         df.insert(0, 'doc_id', doc_id)
         # arrange by score and keep top K
-        df = df.sort_values('score', ascending=False).head(self.top_k)
+        df = df.sort_values('hybrid_score', ascending=False).head(self.top_k)
 
         return df
 
