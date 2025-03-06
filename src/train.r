@@ -120,7 +120,7 @@ message("training model with parameters:\n n_trees = ", opt$n_trees,
         ",\n shrinkage = ", opt$shrinkage,
         ",\n verbose = ", opt$verbose)
 
-xgb_matrix <- model.matrix(~ score + label_freq + occurrences + max_cosine_similarity + min_cosine_similarity + first_occurence + last_occurence + spread + is_prefLabel, data = model_data_train)
+xgb_matrix <- model.matrix(~ hybrid_score + min_cosine_similarity + max_cosine_similarity + label_freq + occurrences + first_occurence + last_occurence + spread + is_prefLabel, data = model_data_train)
 
 bst <- xgboost(
   data = xgb.DMatrix(data = xgb_matrix, label = model_data_train$gold),

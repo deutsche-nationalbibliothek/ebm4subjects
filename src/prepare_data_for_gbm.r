@@ -50,7 +50,9 @@ prepare_data <- function(
       mutate(gold = ifelse(gold, 1.0, 0.0))  |>
       select(
         gold,
-        score,
+        hybrid_score,
+        min_cosine_similarity,
+        max_cosine_similarity, 
         label_freq,
         occurrences,
         max_cosine_similarity,
@@ -83,7 +85,9 @@ prepare_data <- function(
       select(
         doc_id,
         label_id,
-        score,
+        hybrid_score,
+        min_cosine_similarity,
+        max_cosine_similarity, 
         label_freq,
         occurrences,
         max_cosine_similarity,
