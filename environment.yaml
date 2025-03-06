@@ -13,36 +13,32 @@ dependencies:
   - pyarrow
   - dvc
   - dvc-ssh
+  - libsqlite==3.48.0 # required to fix a bug in dvc/sqlite dependencies
   - tqdm
   - nltk
-  - ipykernel # for interactive work in jupyter-notebooks
+  - ipykernel
   - optuna
   - optuna-dashboard
   - pyoxigraph
   - transformers
+  - duckdb
   # dependencies for jina-ai embeddings
   - einops
   - ninja
   - flash-attn
   - triton
   - cuda-libraries-dev
-  - cuda-nvcc # from -c nvidia, needed for ptxas
+  - cuda-nvcc
 
   # train.r
-  #- r-gbm # for alternative models
-  #- r-tree # for alternative models
-  #- r-randomforest # for alternatve models
   - r-xgboost
   - r-tidyverse
   - r-optparse
 
   # compute_metrics.r
-  # - r-optparse already installed for train.r
   - r-base
   - r-languageserver
   - r-aeneval==0.1.14
   - r-rjson
   - r-arrow
   - r-svglite
-  - pip:
-    - weaviate-client==4.9.3

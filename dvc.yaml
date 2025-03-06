@@ -8,30 +8,33 @@ stages:
       - vocab/gnd_pref_labels.arrow
 
   create_vocab_collection:
+    frozen: true
     cmd: 
       - > 
         python src/create_vocab_collection.py \
           --ttl_file vocab/gnd.ttl \
           --collection_name ${vocab_config.collection_name} \
           --overwrite ${vocab_config.overwrite} \
-          --TEI_port ${general.TEI_port} \
+          --db_path ${general.db_path} \
           --phrase "${vocab_config.phrase}" \
           --use_altLabels ${vocab_config.use_altLabels} \
           --arrow_out ${vocab_config.collection_copy}
     deps:
       - src/create_vocab_collection.py
+      - src/duckdb_client.py
       - src/generate_embeddings.py
       - vocab/gnd.ttl
     params:
       - vocab_config.collection_name
       - vocab_config.overwrite
-      - general.TEI_port
+      - general.db_path
       - general.embedding_model
       - general.embedding_dim
       - vocab_config.phrase
       - vocab_config.use_altLabels
     outs:
       - ${vocab_config.collection_copy}
+      - ${general.db_path}
 
   chunk_texts:
     foreach:
@@ -61,7 +64,6 @@ stages:
         - chunk_opts.max_chunks
         - chunk_opts.max_docs
         - chunk_opts.max_sentences_per_doc
-        # - chunk_opts.n_jobs # n_jobs doesn't need to be a dvc dependency, as it has no effect on the output
       outs:
         - results/${item}/chunk_index.arrow
         - results/${item}/chunks.txt
@@ -95,9 +97,12 @@ stages:
       - test
     do:
       cmd: 
+        - cp ${general.db_path} vocab/tmp_db.duckdb
+        - chmod +w vocab/tmp_db.duckdb
         - mkdir -p results/${item}/
         - >
           python src/index_corpus.py 
+          --db_path vocab/tmp_db.duckdb
           --chunks results/${item}/chunks.txt
           --chunk_index results/${item}/chunk_index.arrow 
           --chunk_embeddings results/${item}/chunk_embeddings.npy
@@ -106,18 +111,20 @@ stages:
           --n_hits ${search.n_hits}
           --output results/${item}/candidates.arrow
           --n_jobs ${search.n_jobs}
+        - rm vocab/tmp_db.duckdb
       deps:
         - src/index_corpus.py
+        - src/duckdb_client.py
         - results/${item}/chunk_index.arrow 
         - results/${item}/chunk_embeddings.npy
         - results/${item}/chunks.txt
-        - ${vocab_config.collection_copy} # proxy to track changes in the collection
+        - ${vocab_config.collection_copy}
+        - ${general.db_path}
       params:
         - vocab_config.collection_name 
         - search.alpha
         - search.top_k
         - search.n_hits
-        # search.n_jobs doesn't need to be a dvc dependency, as it has no effect on the output
         - task.name
       outs:
         - results/${item}/candidates.arrow
