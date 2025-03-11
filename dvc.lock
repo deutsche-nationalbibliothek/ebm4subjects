@@ -59,8 +59,8 @@ stages:
       size: 55898370
     - path: results/test/predictions.arrow
       hash: md5
-      md5: 6d8912bbba5f81b1d64e4a6aa1b26994
-      size: 1483034
+      md5: e26d32d504bf43e9a77629a4bd0582c9
+      size: 1483074
     - path: src/compute_metrics.r
       hash: md5
       md5: ba86f225aa8f62b37405b1d394fe366d
@@ -72,31 +72,31 @@ stages:
     outs:
     - path: results//test/prec_at_5.json
       hash: md5
-      md5: 6aa5dd535ed89771d6bfc1122a86a4fc
+      md5: f253028f531fa574951e44ffd0dbfbd7
       size: 37
     - path: results//test/rec_at_5.json
       hash: md5
-      md5: cd28011d8c6903f8ce329caf8a18141c
+      md5: 6536aa53028ed3be7577df1ea4160b52
       size: 36
     - path: results/test/f1_at_5.json
       hash: md5
-      md5: e233ad4129e6c58f2d31e4ee204470b9
+      md5: 8e666a7fc44f037eb6ce99ed85da9119
       size: 35
     - path: results/test/pr_auc.json
       hash: md5
-      md5: 17490154ad2d4324f9531060ab3d44c8
-      size: 28
+      md5: d8b697d0df4e249dedad4d875927ab2d
+      size: 29
     - path: results/test/pr_curve.csv
       hash: md5
-      md5: 8136af58a26b33743f3cb312f26a8742
-      size: 3721
+      md5: 427b48682dc8aebcc33168173f7c1224
+      size: 3724
     - path: results/test/pr_curve_plot.svg
       hash: md5
-      md5: a26acff86a825269eda524018a3e1992
-      size: 17694
+      md5: 8401455b64f4c8546fd291a35c24459f
+      size: 17698
     - path: results/test/rprec_at_5.json
       hash: md5
-      md5: 712dc6d5c4d0a4f322f3e18c183e56f8
+      md5: 59834a0fedcce4ee7e73113624702b00
       size: 38
   index_corpus@validate:
     cmd:
@@ -142,8 +142,8 @@ stages:
       size: 55898370
     - path: results/validate/predictions.arrow
       hash: md5
-      md5: 5e6cf2c4f1d8ffaecdea3167bbc8819d
-      size: 2381418
+      md5: 9764c09798eaff104b892d32c56a9a71
+      size: 2381618
     - path: src/compute_metrics.r
       hash: md5
       md5: ba86f225aa8f62b37405b1d394fe366d
@@ -155,31 +155,31 @@ stages:
     outs:
     - path: results//validate/prec_at_5.json
       hash: md5
-      md5: 9d279e05fd4331846864815acae8b1ae
+      md5: 9137956222123da771ee3242f3409acb
       size: 37
     - path: results//validate/rec_at_5.json
       hash: md5
-      md5: 5f1ce9db0425949733efa719c9ec6341
-      size: 36
+      md5: 11cb84bdb98b5d3eca5f79cd1dba6373
+      size: 35
     - path: results/validate/f1_at_5.json
       hash: md5
-      md5: 8bd77ae390c5b696eb85e1a58f475fe9
+      md5: 37f1354d4e3d79d6c684ba1960646675
       size: 35
     - path: results/validate/pr_auc.json
       hash: md5
-      md5: 1df751bfba743b63b1dba25fa3b30ae5
+      md5: 3870edbdaf069d8e6594a0589b5bf6e3
       size: 29
     - path: results/validate/pr_curve.csv
       hash: md5
-      md5: 901e413f34da6f329330ccd26f6c273d
-      size: 3484
+      md5: d1c46b645f3ce2cd73098741c4d3aca6
+      size: 3580
     - path: results/validate/pr_curve_plot.svg
       hash: md5
-      md5: 75bf6f09ac8baf8a1861f195479c70aa
-      size: 17651
+      md5: 13ae49a1736431d30ec6d5dcf561725b
+      size: 17682
     - path: results/validate/rprec_at_5.json
       hash: md5
-      md5: ca6901408b06646e242fef4279315d44
+      md5: b7e92b3a68833c4c601b4e6ed373d241
       size: 38
   create_collection@test:
     cmd:
@@ -248,7 +248,7 @@ stages:
     deps:
     - path: results/train/chunk_embeddings.npy
       hash: md5
-      md5: 8e5438ef6dc48549cb48bda54abb99b9
+      md5: 302b7c90c955d8b52c0ee35eb792be81
       size: 1595814016
     - path: results/train/chunk_index.arrow
       hash: md5
@@ -276,8 +276,8 @@ stages:
     outs:
     - path: results/train/candidates.arrow
       hash: md5
-      md5: 4b056a57bd593efa1130d1157fa9a0aa
-      size: 18922586
+      md5: cb4e67e874d5290a1a29e03e31cc4d81
+      size: 18921746
   generate_candidates@validate:
     cmd:
     - mkdir -p results/validate/
@@ -288,7 +288,7 @@ stages:
     deps:
     - path: results/validate/chunk_embeddings.npy
       hash: md5
-      md5: a4b59e1e529212794529866d503865c0
+      md5: 4cd38aa9c210aca0d523686af2d36e33
       size: 440762496
     - path: results/validate/chunk_index.arrow
       hash: md5
@@ -316,8 +316,8 @@ stages:
     outs:
     - path: results/validate/candidates.arrow
       hash: md5
-      md5: bd4606b5ea959473c0b218cd65fc4f62
-      size: 5174570
+      md5: 3eec0fda9c6d6aee2ed175ce55b3030a
+      size: 5176602
   generate_candidates@test:
     cmd:
     - mkdir -p results/test/
@@ -328,7 +328,7 @@ stages:
     deps:
     - path: results/test/chunk_embeddings.npy
       hash: md5
-      md5: 2c759423ee7b0450858d0e7b2adf2d94
+      md5: 1798d7670785a56f7af2e2993b02e62c
       size: 270540928
     - path: results/test/chunk_index.arrow
       hash: md5
@@ -356,8 +356,8 @@ stages:
     outs:
     - path: results/test/candidates.arrow
       hash: md5
-      md5: 9285ae9e6f49958baf4edb3fc3d440e1
-      size: 3213690
+      md5: 086f027ad78c50649761973f1d754d41
+      size: 3214930
   train_ranker:
     cmd:
     - mkdir -p results/train/
@@ -381,8 +381,8 @@ stages:
       size: 55898370
     - path: results/train/candidates.arrow
       hash: md5
-      md5: 4b056a57bd593efa1130d1157fa9a0aa
-      size: 18922586
+      md5: cb4e67e874d5290a1a29e03e31cc4d81
+      size: 18921746
     - path: src/prepare_data_for_gbm.r
       hash: md5
       md5: 958f5e1d7d635d51f461979d68bbaaed
@@ -400,8 +400,8 @@ stages:
     outs:
     - path: results/train/model.rds
       hash: md5
-      md5: 73773cc3602914eb39bac4f92557de3f
-      size: 2006988
+      md5: 0c931f0fa847fc2352d33f9aa9ab3ceb
+      size: 2016327
   rank_candidates@validate:
     cmd:
     - mkdir -p results/validate/
@@ -419,12 +419,12 @@ stages:
       size: 31146
     - path: results/train/model.rds
       hash: md5
-      md5: 73773cc3602914eb39bac4f92557de3f
-      size: 2006988
+      md5: 0c931f0fa847fc2352d33f9aa9ab3ceb
+      size: 2016327
     - path: results/validate/candidates.arrow
       hash: md5
-      md5: bd4606b5ea959473c0b218cd65fc4f62
-      size: 5174570
+      md5: 3eec0fda9c6d6aee2ed175ce55b3030a
+      size: 5176602
     - path: src/predict.r
       hash: md5
       md5: a2b25389916d0a5e3b3c43f70f89f89e
@@ -440,8 +440,8 @@ stages:
     outs:
     - path: results/validate/predictions.arrow
       hash: md5
-      md5: 5e6cf2c4f1d8ffaecdea3167bbc8819d
-      size: 2381418
+      md5: 9764c09798eaff104b892d32c56a9a71
+      size: 2381618
   rank_candidates@test:
     cmd:
     - mkdir -p results/test/
@@ -459,12 +459,12 @@ stages:
       size: 20682
     - path: results/test/candidates.arrow
       hash: md5
-      md5: 9285ae9e6f49958baf4edb3fc3d440e1
-      size: 3213690
+      md5: 086f027ad78c50649761973f1d754d41
+      size: 3214930
     - path: results/train/model.rds
       hash: md5
-      md5: 73773cc3602914eb39bac4f92557de3f
-      size: 2006988
+      md5: 0c931f0fa847fc2352d33f9aa9ab3ceb
+      size: 2016327
     - path: src/predict.r
       hash: md5
       md5: a2b25389916d0a5e3b3c43f70f89f89e
@@ -480,13 +480,13 @@ stages:
     outs:
     - path: results/test/predictions.arrow
       hash: md5
-      md5: 6d8912bbba5f81b1d64e4a6aa1b26994
-      size: 1483034
+      md5: e26d32d504bf43e9a77629a4bd0582c9
+      size: 1483074
   create_vocab_collection:
     cmd:
     - "python src/create_vocab_collection.py \\\n  --ttl_file vocab/gnd.ttl \\\n \
       \ --collection_name gnd204k_w_altlabels_no_phrase_jina_1024_retrieval \\\n \
-      \ --overwrite false \\\n  --TEI_port 8090 \\\n  --phrase \"\" \\\n  --use_altLabels
+      \ --overwrite true \\\n  --TEI_port 8090 \\\n  --phrase \"\" \\\n  --use_altLabels
       true \\\n  --arrow_out vocab/gnd204k_w_altlabels.arrow\n"
     deps:
     - path: src/create_vocab_collection.py
@@ -495,8 +495,8 @@ stages:
       size: 7074
     - path: src/generate_embeddings.py
       hash: md5
-      md5: 06f1d956bf4af6164d5bd63bc4f11d17
-      size: 1668
+      md5: fbec86cb47dc357da32fc52017f9de56
+      size: 1023
     - path: vocab/gnd.ttl
       hash: md5
       md5: a6a6db61f89d43c58dc2f5d4d6180c39
@@ -507,7 +507,7 @@ stages:
         general.embedding_dim: 1024
         general.embedding_model: jinaai/jina-embeddings-v3
         vocab_config.collection_name: gnd204k_w_altlabels_no_phrase_jina_1024_retrieval
-        vocab_config.overwrite: false
+        vocab_config.overwrite: true
         vocab_config.phrase: ''
         vocab_config.use_altLabels: true
     outs:
