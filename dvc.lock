@@ -517,45 +517,36 @@ stages:
       size: 1483706
   create_vocab_collection:
     cmd:
-    - "python src/create_vocab_collection.py \\\n  --ttl_file vocab/gnd.ttl \\\n \
-      \ --collection_name gnd204k_w_altlabels_no_phrase_jina_1024_retrieval \\\n \
-      \ --overwrite true \\\n  --db_path gnd.duckdb \\\n  --phrase \"\" \\\n  --use_altLabels
-      true \\\n  --arrow_out vocab/gnd204k_w_altlabels.arrow\n"
+    - "python src/create_vocab_collection.py \\\n  --arrow_in vocab/gnd204k_w_altlabels.arrow
+      \\\n  --embeddings vocab/embeddings.npy \\\n  --collection_name gnd204k_w_altlabels_no_phrase_jina_1024_retrieval
+      \\\n  --overwrite true \\\n  --db_path vocab/gnd.duckdb \n"
     deps:
     - path: src/create_vocab_collection.py
       hash: md5
-      md5: 25a807839ffc1b1555cc86f2869f6e0b
-      size: 3532
+      md5: 951cf5dc5fc5da9767c45f65af0e4b75
+      size: 3100
     - path: src/duckdb_client.py
       hash: md5
       md5: e891cac18c97b98dcbae741fead38a5f
       size: 15798
-    - path: src/generate_embeddings.py
+    - path: vocab/embeddings.npy
       hash: md5
-      md5: fbec86cb47dc357da32fc52017f9de56
-      size: 1023
-    - path: vocab/gnd.ttl
-      hash: md5
-      md5: a6a6db61f89d43c58dc2f5d4d6180c39
-      size: 53388861
-    params:
-      params.yaml:
-        general.db_path: gnd.duckdb
-        general.embedding_dim: 1024
-        general.embedding_model: jinaai/jina-embeddings-v3
-        vocab_config.collection_name: gnd204k_w_altlabels_no_phrase_jina_1024_retrieval
-        vocab_config.overwrite: true
-        vocab_config.phrase: ''
-        vocab_config.use_altLabels: true
-    outs:
-    - path: gnd.duckdb
-      hash: md5
-      md5: 42fdf25a868b0fe3feb904d8d571a3e2
-      size: 7309635584
+      md5: 465d919948ac57239ebdd40f878d1599
+      size: 2758234240
     - path: vocab/gnd204k_w_altlabels.arrow
       hash: md5
-      md5: 52531ce2116e02487e6f51833475638c
-      size: 4080948842
+      md5: f453d8605dd218ad758e3d178bca48a5
+      size: 17008698
+    params:
+      params.yaml:
+        general.db_path: vocab/gnd.duckdb
+        vocab_config.collection_name: gnd204k_w_altlabels_no_phrase_jina_1024_retrieval
+        vocab_config.overwrite: true
+    outs:
+    - path: vocab/gnd.duckdb
+      hash: md5
+      md5: 3e7cc9b8ac8955cfd0e20337af5e32ab
+      size: 7308324864
   chunk_texts@test:
     cmd:
     - mkdir -p results/test/
