@@ -7,33 +7,44 @@ stages:
     outs:
       - vocab/gnd_pref_labels.arrow
 
-  create_vocab_collection:
-    frozen: true
+  create_vocab_embeddings:
     cmd: 
       - > 
-        python src/create_vocab_collection.py \
+        python src/create_vocab_embeddings.py \
           --ttl_file vocab/gnd.ttl \
-          --collection_name ${vocab_config.collection_name} \
-          --overwrite ${vocab_config.overwrite} \
-          --db_path ${general.db_path} \
           --phrase "${vocab_config.phrase}" \
           --use_altLabels ${vocab_config.use_altLabels} \
-          --arrow_out ${vocab_config.collection_copy}
+          --arrow_out ${vocab_config.collection_copy} \
+          --embeddings_out ${vocab_config.embeddings}
     deps:
-      - src/create_vocab_collection.py
-      - src/duckdb_client.py
+      - src/create_vocab_embeddings.py
       - src/generate_embeddings.py
       - vocab/gnd.ttl
     params:
-      - vocab_config.collection_name
-      - vocab_config.overwrite
-      - general.db_path
       - general.embedding_model
       - general.embedding_dim
       - vocab_config.phrase
       - vocab_config.use_altLabels
     outs:
       - ${vocab_config.collection_copy}
+      - ${vocab_config.embeddings}
+
+  create_vocab_collection:
+    frozen: true
+    cmd: 
+      - > 
+        python src/create_vocab_collection.py \
+          --collection_name ${vocab_config.collection_name} \
+          --overwrite ${vocab_config.overwrite} \
+          --db_path ${general.db_path} \
+    deps:
+      - src/create_vocab_collection.py
+      - src/duckdb_client.py
+    params:
+      - vocab_config.collection_name
+      - vocab_config.overwrite
+      - general.db_path
+    outs:
       - ${general.db_path}
 
   chunk_texts:

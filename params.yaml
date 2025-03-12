@@ -10,6 +10,7 @@ vocab_config:
   phrase: ""
   use_altLabels: true
   collection_copy: vocab/gnd204k_w_altlabels.arrow
+  embeddings: vocab/embeddings.npy
 
 chunk_opts:
   chunk_size: 50
