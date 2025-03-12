@@ -68,7 +68,7 @@ def insert_vocab(
         client: weaviate.Client, 
         collection_name: str,
         vocab: pd.DataFrame,
-        embeddings: torch.Tensor,
+        embeddings: np.ndarray,
         phrase: str = None):
     print(f"Inserting vocabulary into {collection_name}")
     this_collection = client.collections.get(collection_name)
@@ -107,6 +107,7 @@ def insert_vocab(
 
 def run():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--arrow_in", help="Input Filename/Path", type=str, required=True)
     parser.add_argument("--embeddings", help="Input Filename/Path", type=str, required=True)
     parser.add_argument("--collection_name", help="Collection Name in Weaviate", type=str, required=True)
     parser.add_argument("--TEI_port", help="Host", type=str, default='8090')
@@ -114,6 +115,7 @@ def run():
     # parser.add_argument("--labelkind", help="Labelkind", type=list, default=["prefLabel"])
     args = parser.parse_args()
     embeddings = np.load(args.embeddings)
+    vocab = pd.read_feather(args.arrow_in)
     client = weaviate.connect_to_local()
     if str2bool(args.overwrite):
         create_collection(client, args.collection_name, overwrite=str2bool(args.overwrite), TEI_port=args.TEI_port)

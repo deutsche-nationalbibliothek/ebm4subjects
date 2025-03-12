@@ -34,12 +34,14 @@ stages:
       - > 
         python src/create_vocab_collection.py \
           --embeddings ${vocab_config.embeddings} \
+          --arrow_in ${vocab_config.collection_copy} \
           --collection_name ${vocab_config.collection_name} \
           --overwrite ${vocab_config.overwrite} \
           --TEI_port ${general.TEI_port}
     deps:
       - src/create_vocab_collection.py
       - ${vocab_config.embeddings}
+      - ${vocab_config.collection_copy} 
     params:
       - vocab_config.collection_name
       - vocab_config.overwrite
