@@ -5,7 +5,7 @@ general:
   batch_size: 1024
 
 vocab_config:
-  overwrite: false
+  overwrite: true
   collection_name: gnd204k_w_altlabels_no_phrase_jina_1024_retrieval
   phrase: ''
   use_altLabels: true

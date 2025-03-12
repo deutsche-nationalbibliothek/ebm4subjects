@@ -484,37 +484,27 @@ stages:
       size: 1483074
   create_vocab_collection:
     cmd:
-    - "python src/create_vocab_collection.py \\\n  --ttl_file vocab/gnd.ttl \\\n \
-      \ --collection_name gnd204k_w_altlabels_no_phrase_jina_1024_retrieval \\\n \
-      \ --overwrite true \\\n  --TEI_port 8090 \\\n  --phrase \"\" \\\n  --use_altLabels
-      true \\\n  --arrow_out vocab/gnd204k_w_altlabels.arrow\n"
+    - "python src/create_vocab_collection.py \\\n  --embeddings vocab/embeddings.npy
+      \\\n  --arrow_in vocab/gnd204k_w_altlabels.arrow \\\n  --collection_name gnd204k_w_altlabels_no_phrase_jina_1024_retrieval
+      \\\n  --overwrite true \\\n  --TEI_port 8090\n"
     deps:
     - path: src/create_vocab_collection.py
       hash: md5
-      md5: 0479a0d7f4539a01e1096a9ea179c4c0
-      size: 7074
-    - path: src/generate_embeddings.py
+      md5: d7e598c7681edae2e94c004c32e015c6
+      size: 5086
+    - path: vocab/embeddings.npy
       hash: md5
-      md5: fbec86cb47dc357da32fc52017f9de56
-      size: 1023
-    - path: vocab/gnd.ttl
+      md5: 465d919948ac57239ebdd40f878d1599
+      size: 2758234240
+    - path: vocab/gnd204k_w_altlabels.arrow
       hash: md5
-      md5: a6a6db61f89d43c58dc2f5d4d6180c39
-      size: 53388861
+      md5: f453d8605dd218ad758e3d178bca48a5
+      size: 17008698
     params:
       params.yaml:
         general.TEI_port: 8090
-        general.embedding_dim: 1024
-        general.embedding_model: jinaai/jina-embeddings-v3
         vocab_config.collection_name: gnd204k_w_altlabels_no_phrase_jina_1024_retrieval
         vocab_config.overwrite: true
-        vocab_config.phrase: ''
-        vocab_config.use_altLabels: true
-    outs:
-    - path: vocab/gnd204k_w_altlabels.arrow
-      hash: md5
-      md5: bfc5257f2c7ce8c018a0938bfad2b340
-      size: 17026962
   chunk_texts@test:
     cmd:
     - mkdir -p results/test/
@@ -698,3 +688,36 @@ stages:
       hash: md5
       md5: 4cd38aa9c210aca0d523686af2d36e33
       size: 440762496
+  create_vocab_embeddings:
+    cmd:
+    - "python src/create_vocab_embeddings.py \\\n  --ttl_file vocab/gnd.ttl \\\n \
+      \ --phrase \"\" \\\n  --use_altLabels true \\\n  --arrow_out vocab/gnd204k_w_altlabels.arrow
+      \\\n  --embeddings_out vocab/embeddings.npy\n"
+    deps:
+    - path: src/create_vocab_embeddings.py
+      hash: md5
+      md5: 2112355e3b20d8a574d395c95ac9e85b
+      size: 2334
+    - path: src/generate_embeddings.py
+      hash: md5
+      md5: fbec86cb47dc357da32fc52017f9de56
+      size: 1023
+    - path: vocab/gnd.ttl
+      hash: md5
+      md5: a6a6db61f89d43c58dc2f5d4d6180c39
+      size: 53388861
+    params:
+      params.yaml:
+        general.embedding_dim: 1024
+        general.embedding_model: jinaai/jina-embeddings-v3
+        vocab_config.phrase: ''
+        vocab_config.use_altLabels: true
+    outs:
+    - path: vocab/embeddings.npy
+      hash: md5
+      md5: 465d919948ac57239ebdd40f878d1599
+      size: 2758234240
+    - path: vocab/gnd204k_w_altlabels.arrow
+      hash: md5
+      md5: f453d8605dd218ad758e3d178bca48a5
+      size: 17008698
