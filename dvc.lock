@@ -59,8 +59,8 @@ stages:
       size: 55898370
     - path: results/test/predictions.arrow
       hash: md5
-      md5: 674596028a15cbb07a264907a0c3735f
-      size: 1485514
+      md5: bebe6d60d365d6a16729252a97ac6140
+      size: 1483706
     - path: src/compute_metrics.r
       hash: md5
       md5: ba86f225aa8f62b37405b1d394fe366d
@@ -72,31 +72,31 @@ stages:
     outs:
     - path: results//test/prec_at_5.json
       hash: md5
-      md5: 3bb627f22a4dfe08b6a52af2d7d9c092
+      md5: 1968797a7793e7f9632016b986167936
       size: 37
     - path: results//test/rec_at_5.json
       hash: md5
-      md5: 20c3f5b5eff06f3c7a3b1576212a64df
+      md5: 89c1c0b13877d4b936eb73975c2f2584
       size: 36
     - path: results/test/f1_at_5.json
       hash: md5
-      md5: 5b4b02994f854e93ef794716bb643569
+      md5: 67761ffbd6cac45684f195bb416e1614
       size: 35
     - path: results/test/pr_auc.json
       hash: md5
-      md5: e02d069c7bd170e72e560c7f456e3caf
+      md5: 6ae6cf54e68db8491f73e616400aef24
       size: 29
     - path: results/test/pr_curve.csv
       hash: md5
-      md5: 9110bf77e12203f933f2dad6c8a03ad9
-      size: 3255
+      md5: 5974b5bc51f992f6f99e7ef02a26493c
+      size: 3332
     - path: results/test/pr_curve_plot.svg
       hash: md5
-      md5: 48b08d95fd26098cea8d4aee47063332
-      size: 17616
+      md5: fa9458e9940673c8b5ea92b8cee02674
+      size: 17650
     - path: results/test/rprec_at_5.json
       hash: md5
-      md5: 6d05f624db9ad1a9ae893d2962cb237e
+      md5: 3ed6b056a7572b80fc07add609fb8b0a
       size: 38
   index_corpus@validate:
     cmd:
@@ -142,8 +142,8 @@ stages:
       size: 55898370
     - path: results/validate/predictions.arrow
       hash: md5
-      md5: f1b4cd9aad67fd1061e5f8f7319c05b9
-      size: 2392642
+      md5: f2c6ee683db15e0f4971d66a6324844e
+      size: 2386146
     - path: src/compute_metrics.r
       hash: md5
       md5: ba86f225aa8f62b37405b1d394fe366d
@@ -155,31 +155,31 @@ stages:
     outs:
     - path: results//validate/prec_at_5.json
       hash: md5
-      md5: 3fbac138a809f5b79711926a5fe8ecb4
+      md5: 8e31047733131529eaec7c0e68e20d2d
       size: 37
     - path: results//validate/rec_at_5.json
       hash: md5
-      md5: 2120ab045df2154993b4a64741429d1a
+      md5: 82405593ae95a41ac468eba4d1ffc55f
       size: 36
     - path: results/validate/f1_at_5.json
       hash: md5
-      md5: 35feb4a46bc6c08f1b05e3e004cfe6d4
-      size: 34
+      md5: 7c8114265e4036fb3b118684959e07ec
+      size: 35
     - path: results/validate/pr_auc.json
       hash: md5
-      md5: 8ce11b0904cb1f57ab80f9de04b4951c
+      md5: a14ad7386c6f6e8078549308cba71508
       size: 29
     - path: results/validate/pr_curve.csv
       hash: md5
-      md5: 54309e796c02167b1f5485e4c6652440
-      size: 3724
+      md5: 2f7213023831c5b41a560ad30ff87567
+      size: 3207
     - path: results/validate/pr_curve_plot.svg
       hash: md5
-      md5: dc96d3b8e2a4ae0ead9d2f6f7dc0f73f
-      size: 17170
+      md5: 0a2a9ea45eabac2495d00c6ab0942204
+      size: 17245
     - path: results/validate/rprec_at_5.json
       hash: md5
-      md5: 16670627b8af30371c3ef07c5be3c26a
+      md5: de5cff0961418ebc20eec999e0801aa6
       size: 38
   create_collection@test:
     cmd:
@@ -251,8 +251,8 @@ stages:
     deps:
     - path: gnd.duckdb
       hash: md5
-      md5: 6e2d59440024e41689684b01a7f75cb9
-      size: 7308849152
+      md5: 42fdf25a868b0fe3feb904d8d571a3e2
+      size: 7309635584
     - path: results/train/chunk_embeddings.npy
       hash: md5
       md5: 302b7c90c955d8b52c0ee35eb792be81
@@ -267,8 +267,8 @@ stages:
       size: 93306134
     - path: src/duckdb_client.py
       hash: md5
-      md5: 56bd627f003c4a6d0e023bb9bb29a63f
-      size: 15746
+      md5: e891cac18c97b98dcbae741fead38a5f
+      size: 15798
     - path: src/index_corpus.py
       hash: md5
       md5: e22255ef72723c2fb09e92a6cbd2f33a
@@ -287,8 +287,8 @@ stages:
     outs:
     - path: results/train/candidates.arrow
       hash: md5
-      md5: baa7a3b2ca655ab96f3c250e35bd7b5c
-      size: 19726954
+      md5: 4e4368d2aa156a300339397249416c24
+      size: 19873410
   generate_candidates@validate:
     cmd:
     - cp gnd.duckdb vocab/tmp_db.duckdb
@@ -302,8 +302,8 @@ stages:
     deps:
     - path: gnd.duckdb
       hash: md5
-      md5: 6e2d59440024e41689684b01a7f75cb9
-      size: 7308849152
+      md5: 42fdf25a868b0fe3feb904d8d571a3e2
+      size: 7309635584
     - path: results/validate/chunk_embeddings.npy
       hash: md5
       md5: 4cd38aa9c210aca0d523686af2d36e33
@@ -318,8 +318,8 @@ stages:
       size: 25477212
     - path: src/duckdb_client.py
       hash: md5
-      md5: 56bd627f003c4a6d0e023bb9bb29a63f
-      size: 15746
+      md5: e891cac18c97b98dcbae741fead38a5f
+      size: 15798
     - path: src/index_corpus.py
       hash: md5
       md5: e22255ef72723c2fb09e92a6cbd2f33a
@@ -338,8 +338,8 @@ stages:
     outs:
     - path: results/validate/candidates.arrow
       hash: md5
-      md5: a865979cebc0a45ba42a29a070d7968d
-      size: 5165202
+      md5: 03c53c6e464875cb9da9b25e9b79acf4
+      size: 5198026
   generate_candidates@test:
     cmd:
     - cp gnd.duckdb vocab/tmp_db.duckdb
@@ -353,8 +353,8 @@ stages:
     deps:
     - path: gnd.duckdb
       hash: md5
-      md5: 6e2d59440024e41689684b01a7f75cb9
-      size: 7308849152
+      md5: 42fdf25a868b0fe3feb904d8d571a3e2
+      size: 7309635584
     - path: results/test/chunk_embeddings.npy
       hash: md5
       md5: 1798d7670785a56f7af2e2993b02e62c
@@ -369,8 +369,8 @@ stages:
       size: 15499084
     - path: src/duckdb_client.py
       hash: md5
-      md5: 56bd627f003c4a6d0e023bb9bb29a63f
-      size: 15746
+      md5: e891cac18c97b98dcbae741fead38a5f
+      size: 15798
     - path: src/index_corpus.py
       hash: md5
       md5: e22255ef72723c2fb09e92a6cbd2f33a
@@ -389,8 +389,8 @@ stages:
     outs:
     - path: results/test/candidates.arrow
       hash: md5
-      md5: b95ccf6f34f737b99b3c0e674ae12e6a
-      size: 3176242
+      md5: ea99174aa5b3d0030fae4f2aeaf582e1
+      size: 3200946
   train_ranker:
     cmd:
     - mkdir -p results/train/
@@ -414,8 +414,8 @@ stages:
       size: 55898370
     - path: results/train/candidates.arrow
       hash: md5
-      md5: baa7a3b2ca655ab96f3c250e35bd7b5c
-      size: 19726954
+      md5: 4e4368d2aa156a300339397249416c24
+      size: 19873410
     - path: src/prepare_data_for_gbm.r
       hash: md5
       md5: ec75fef621642ff0a6dba4c2a7d2a13b
@@ -433,8 +433,8 @@ stages:
     outs:
     - path: results/train/model.rds
       hash: md5
-      md5: a2ba238382f8d6459322eb03a5b274aa
-      size: 1951822
+      md5: 9f4d02d9d48fac8e012066742ef5c276
+      size: 1976379
   rank_candidates@validate:
     cmd:
     - mkdir -p results/validate/
@@ -452,12 +452,12 @@ stages:
       size: 31146
     - path: results/train/model.rds
       hash: md5
-      md5: a2ba238382f8d6459322eb03a5b274aa
-      size: 1951822
+      md5: 9f4d02d9d48fac8e012066742ef5c276
+      size: 1976379
     - path: results/validate/candidates.arrow
       hash: md5
-      md5: a865979cebc0a45ba42a29a070d7968d
-      size: 5165202
+      md5: 03c53c6e464875cb9da9b25e9b79acf4
+      size: 5198026
     - path: src/predict.r
       hash: md5
       md5: 49869a130c439d49e7cac20d12cfc22e
@@ -473,8 +473,8 @@ stages:
     outs:
     - path: results/validate/predictions.arrow
       hash: md5
-      md5: f1b4cd9aad67fd1061e5f8f7319c05b9
-      size: 2392642
+      md5: f2c6ee683db15e0f4971d66a6324844e
+      size: 2386146
   rank_candidates@test:
     cmd:
     - mkdir -p results/test/
@@ -492,12 +492,12 @@ stages:
       size: 20682
     - path: results/test/candidates.arrow
       hash: md5
-      md5: b95ccf6f34f737b99b3c0e674ae12e6a
-      size: 3176242
+      md5: ea99174aa5b3d0030fae4f2aeaf582e1
+      size: 3200946
     - path: results/train/model.rds
       hash: md5
-      md5: a2ba238382f8d6459322eb03a5b274aa
-      size: 1951822
+      md5: 9f4d02d9d48fac8e012066742ef5c276
+      size: 1976379
     - path: src/predict.r
       hash: md5
       md5: 49869a130c439d49e7cac20d12cfc22e
@@ -513,8 +513,8 @@ stages:
     outs:
     - path: results/test/predictions.arrow
       hash: md5
-      md5: 674596028a15cbb07a264907a0c3735f
-      size: 1485514
+      md5: bebe6d60d365d6a16729252a97ac6140
+      size: 1483706
   create_vocab_collection:
     cmd:
     - "python src/create_vocab_collection.py \\\n  --ttl_file vocab/gnd.ttl \\\n \
@@ -528,8 +528,8 @@ stages:
       size: 3532
     - path: src/duckdb_client.py
       hash: md5
-      md5: 673c21e4eea38790a4707d4f0f45f95a
-      size: 15466
+      md5: e891cac18c97b98dcbae741fead38a5f
+      size: 15798
     - path: src/generate_embeddings.py
       hash: md5
       md5: fbec86cb47dc357da32fc52017f9de56
@@ -550,8 +550,8 @@ stages:
     outs:
     - path: gnd.duckdb
       hash: md5
-      md5: 6e2d59440024e41689684b01a7f75cb9
-      size: 7308849152
+      md5: 42fdf25a868b0fe3feb904d8d571a3e2
+      size: 7309635584
     - path: vocab/gnd204k_w_altlabels.arrow
       hash: md5
       md5: 52531ce2116e02487e6f51833475638c
