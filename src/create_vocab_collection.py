@@ -2,50 +2,13 @@ import argparse
 from tqdm import tqdm
 import itertools
 import pandas as pd
+import numpy as np
 from pathlib import Path
-import pyoxigraph
-from pyoxigraph import RdfFormat
-import pandas as pd
-import torch
 import weaviate
 import weaviate.classes as wvc
 from weaviate.util import generate_uuid5
-from generate_embeddings import generate_embeddings
 from utils import str2bool
 
-PREF_LABEL_IRI = "http://www.w3.org/2004/02/skos/core#prefLabel"
-ALT_LABEL_IRI = "http://www.w3.org/2004/02/skos/core#altLabel"
-
-def parse_vocab(ttl_path: Path, use_altLabels: bool = True, phrase: str = None) -> pd.DataFrame:
-    print(f"Parsing vocabulary from {ttl_path}")
-    with ttl_path.open("rb") as f:
-        graph = pyoxigraph.parse(f, RdfFormat.TURTLE)
-        labels: list[(str, str, bool)] = []
-        # uris: list[str] = []
-        # limit = 100
-        #itertools.islice(graph, limit)
-
-        for s,p,o,_  in tqdm(graph, desc="Processing triples"):
-            uri = s.value
-            idn = uri.split('/')[-1]  # extract idn from uri
-            is_prefLabel = (p.value == PREF_LABEL_IRI)
-            is_altLabel = (p.value == ALT_LABEL_IRI)
-            label_text = o.value if phrase is None else f"{phrase}{o.value}"
-            if is_prefLabel:
-                labels.append((idn, label_text, True))
-            elif is_altLabel and use_altLabels:
-                labels.append((idn, label_text, False))
-
-            # uris.append(idn)
-
-        labels = pd.DataFrame(labels, columns=["idn", "label_text", "is_prefLabel"])
-        # labels.drop_duplicates("idn", keep="first", inplace=True)
-        # uris = pd.DataFrame(list(set(uris)), columns=["idn"])
-
-    # df  = pd.merge(uris, labels, on="idn", how="left")
-    # gnd_data = pd.read_feather("gnd_data.arrow")
-    # df = pd.merge(df, gnd_data, on="idn", how="left")
-        return labels
     
 def create_collection(
         client: weaviate.Client, 
@@ -144,26 +107,18 @@ def insert_vocab(
 
 def run():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--ttl_file", help="Input Filename/Path", type=str, required=True)
+    parser.add_argument("--embeddings", help="Input Filename/Path", type=str, required=True)
     parser.add_argument("--collection_name", help="Collection Name in Weaviate", type=str, required=True)
     parser.add_argument("--TEI_port", help="Host", type=str, default='8090')
-    parser.add_argument("--phrase", help="Phrase", type=str, default="Ein gutes Schlagwort für dieses Dokument lautet: ")
     parser.add_argument("--overwrite", help="Overwrite", type=str, default=True)
-    parser.add_argument("--arrow_out", help="Arrow output", type=str, default=None)
-    parser.add_argument("--use_altLabels", help="Use altLabels", type=str, default=True)
     # parser.add_argument("--labelkind", help="Labelkind", type=list, default=["prefLabel"])
     args = parser.parse_args()
-    vocab = parse_vocab(Path(args.ttl_file), use_altLabels=str2bool(args.use_altLabels), phrase=args.phrase)
-
+    embeddings = np.load(args.embeddings)
     client = weaviate.connect_to_local()
     if str2bool(args.overwrite):
-        embeddings = generate_embeddings(vocab["label_text"].tolist(), task = "retrieval.query")
         create_collection(client, args.collection_name, overwrite=str2bool(args.overwrite), TEI_port=args.TEI_port)
         insert_vocab(client, args.collection_name, vocab, embeddings) 
         # Note: phrase is already passed to parse_vocab
-    
-    if args.arrow_out is not None:
-        vocab.to_feather(args.arrow_out)
 
     if not client.collections.exists(args.collection_name):
         raise ValueError(f"Collection {args.collection_name} does not exist. Try running with --overwrite=True")
