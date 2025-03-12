@@ -135,6 +135,7 @@ class Duckdb_client:
                 }
             )
         )
+        result_df["score"] = 1 - result_df["score"]
         result_df["cosine_similarity"] = result_df["score"]
         result_df["score"] = result_df.groupby("id")["score"].transform(
             lambda x: x / x.max()
