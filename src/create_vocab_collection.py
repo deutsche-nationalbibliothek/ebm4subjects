@@ -2,6 +2,7 @@ import argparse
 from pathlib import Path
 
 import pandas as pd
+import numpy as np
 import pyoxigraph
 from dvc.api import params_show
 from tqdm import tqdm
@@ -44,12 +45,6 @@ def parse_vocab(
 def run():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--ttl_file",
-        help="Input file",
-        type=str,
-        default="vocab/gnd.ttl",
-    )
-    parser.add_argument(
         "--collection_name",
         help="Collection name",
         type=str,
@@ -58,38 +53,33 @@ def run():
     parser.add_argument(
         "--db_path", help="Path to DuckDB", type=str, default="gnd.duckdb"
     )
-    parser.add_argument(
-        "--phrase",
-        help="Phrase",
-        type=str,
-        default="Ein gutes Schlagwort für dieses Dokument lautet: ",
-    )
     parser.add_argument("--overwrite", help="Overwrite", type=str, default=True)
     parser.add_argument(
-        "--arrow_out",
-        help="Arrow output",
+        "--arrow_in",
+        help="Arrow input",
         type=str,
         default="vocab/gnd204k_w_altlabels_w_embeddings.arrow",
     )
-    parser.add_argument("--use_altLabels", help="Use altLabels", type=str, default=True)
+    parser.add_argument(
+        "--embeddings",
+        help="Numpy Array with embeddings",
+        type=str,
+        default="vocab/embeddings.npy",
+    )
     args = parser.parse_args()
 
-    vocab = parse_vocab(
-        Path(args.ttl_file),
-        use_altLabels=str2bool(args.use_altLabels),
-        phrase=args.phrase,
-    )
+    vocab = pd.read_feather(args.arrow_in)
 
     client = Duckdb_client(
         db_path=args.db_path,
         config={"hnsw_enable_experimental_persistence": True},
     )
 
+    embeddings = np.load(args.embeddings)
+
     if str2bool(args.overwrite):
         vocab["embeddings"] = pd.Series(
-            generate_embeddings(
-                vocab["label_text"].tolist(), task="retrieval.query"
-            ).tolist()
+            embeddings.tolist()
         )
         vocab["id"] = [i for i in range(len(vocab["idn"].tolist()))]
 
@@ -108,9 +98,6 @@ def run():
             },
             force=args.overwrite,
         )
-
-    if args.arrow_out is not None:
-        vocab.to_feather(args.arrow_out)
 
 
 run()

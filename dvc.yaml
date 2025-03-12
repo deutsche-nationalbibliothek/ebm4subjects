@@ -30,16 +30,19 @@ stages:
       - ${vocab_config.embeddings}
 
   create_vocab_collection:
-    frozen: true
     cmd: 
       - > 
         python src/create_vocab_collection.py \
+          --arrow_in ${vocab_config.collection_copy} \
+          --embeddings ${vocab_config.embeddings} \
           --collection_name ${vocab_config.collection_name} \
           --overwrite ${vocab_config.overwrite} \
-          --db_path ${general.db_path} \
+          --db_path ${general.db_path} 
     deps:
       - src/create_vocab_collection.py
       - src/duckdb_client.py
+      - ${vocab_config.collection_copy}
+      - ${vocab_config.embeddings}
     params:
       - vocab_config.collection_name
       - vocab_config.overwrite

@@ -1,5 +1,5 @@
 general:
-  db_path: gnd.duckdb
+  db_path: vocab/gnd.duckdb
   embedding_model: jinaai/jina-embeddings-v3
   embedding_dim: 1024
   batch_size: 1024
