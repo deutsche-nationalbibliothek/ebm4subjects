@@ -1,6 +1,7 @@
 from threading import Thread
 import duckdb
 import pandas as pd
+import polars as pl
 from tqdm import tqdm
 
 
@@ -78,8 +79,7 @@ class Duckdb_client:
 
     def vector_search(
         self,
-        query_df: pd.DataFrame,
-        n_chunks_df: pd.DataFrame,
+        query_df: pl.DataFrame,
         collection_name: str,
         vector_dimensions: int,
         n_jobs: int = 1,
@@ -89,27 +89,31 @@ class Duckdb_client:
         hnsw_metric_function: str = "array_distance",
     ):
         query_dfs = [
-            query_df[i : i + chunk_size]
-            for i in range(0, query_df.shape[0], chunk_size)
+            query_df.slice(i, chunk_size) for i in range(0, query_df.height, chunk_size)
         ]
-
         batches = [query_dfs[i : i + n_jobs] for i in range(0, len(query_dfs), n_jobs)]
 
-        result_dfs = []
+        self.connection.execute("""CREATE OR REPLACE TABLE results ( 
+                                id INTEGER,
+                                doc_id VARCHAR,
+                                chunk_position INTEGER,
+                                n_chunks INTEGER,
+                                label_id VARCHAR,
+                                is_prefLabel BOOLEAN,
+                                score FLOAT)""")
+
         for batch_number, batch in enumerate(tqdm(batches, desc="Processing batches")):
             threads = []
-            for thread_number, df in enumerate(batch):
+            for df in batch:
                 threads.append(
                     Thread(
                         target=self.__vss_thread_query,
                         args=(
                             df,
-                            result_dfs,
                             collection_name,
                             vector_dimensions,
                             hnsw_metric_function,
                             n_hits,
-                            thread_number
                         ),
                     )
                 )
@@ -119,64 +123,54 @@ class Duckdb_client:
             for thread in tqdm(threads, desc=f"Processing batch {batch_number + 1}"):
                 thread.join()
 
-        result_df = pd.concat(result_dfs, ignore_index=True)
+        result_df = self.connection.execute("SELECT * FROM results").pl()
 
         result_df = (
-            result_df.explode(
-                ["is_prefLabels", "label_texts", "vss_matches", "vss_scores"]
+            result_df.group_by("id")
+            .agg(
+                doc_id=pl.col("doc_id").first(),
+                chunk_position=pl.col("chunk_position").first(),
+                n_chunks=pl.col("n_chunks").first(),
+                label_id=pl.col("label_id"),
+                is_prefLabel=pl.col("is_prefLabel"),
+                score=pl.col("score") / pl.col("score").max(),
             )
-            .reset_index(drop=True)
-            .rename(
-                columns={
-                    "is_prefLabels": "is_prefLabel",
-                    "label_texts": "label_text",
-                    "vss_matches": "label_id",
-                    "vss_scores": "score",
-                }
-            )
-        )
-        result_df["score"] = 1 - result_df["score"]
-        result_df["cosine_similarity"] = result_df["score"]
-        result_df["score"] = result_df.groupby("id")["score"].transform(
-            lambda x: x / x.max()
+            .explode(["label_id", "is_prefLabel", "score"])
         )
 
         result_df = (
-            result_df.sort_values("score", ascending=False)
-            .groupby(["id", "label_id", "doc_id"])
+            result_df.sort("score", descending=True)
+            .group_by(["id", "label_id", "doc_id"])
             .head(1)
         )
 
+        result_df = result_df.group_by(["doc_id", "label_id"]).agg(
+            score=pl.col("score").sum(),
+            occurrences=pl.col("doc_id").count(),
+            min_cosine_similarity=pl.col("score").min(),
+            max_cosine_similarity=pl.col("score").max(),
+            first_occurence=pl.col("chunk_position").min(),
+            last_occurence=pl.col("chunk_position").max(),
+            spread=(pl.col("chunk_position").max() - pl.col("chunk_position").min()),
+            is_prefLabel=pl.col("is_prefLabel").first(),
+            n_chunks=pl.col("n_chunks").first(),
+        )
+
         result_df = (
-            result_df.groupby(["doc_id", "label_id"])
-            .agg(
-                score=("score", "sum"),
-                occurrences=("doc_id", "count"),
-                max_cosine_similarity=("cosine_similarity", "max"),
-                min_cosine_similarity=("cosine_similarity", "min"),
-                first_occurence=("chunk_position", "min"),
-                last_occurence=("chunk_position", "max"),
-                spread=("chunk_position", lambda x: x.max() - x.min()),
-                is_prefLabel=("is_prefLabel", "any"),
+            result_df.sort("score", descending=True).group_by("doc_id").head(top_k)
+        )
+
+        result_df = (
+            result_df.with_columns(
+                (pl.col("score") / pl.col("n_chunks")),
+                (pl.col("occurrences") / pl.col("n_chunks")),
+                (pl.col("first_occurence") / pl.col("n_chunks")),
+                (pl.col("last_occurence") / pl.col("n_chunks")),
+                (pl.col("spread") / pl.col("n_chunks")),
             )
-            .reset_index()
+            .drop("n_chunks")
+            .sort(["doc_id", "label_id"])
         )
-        result_df = (
-            result_df.sort_values(["score"], ascending=False)
-            .groupby("doc_id")
-            .head(top_k)
-        )
-        result_df = pd.merge(result_df, n_chunks_df, on="doc_id", how="left")
-        result_df["score"] = result_df["score"] / result_df["n_chunks"]
-        result_df["occurrences"] = result_df["occurrences"] / result_df["n_chunks"]
-        result_df["first_occurence"] = (
-            result_df["first_occurence"] / result_df["n_chunks"]
-        )
-        result_df["last_occurence"] = (
-            result_df["last_occurence"] / result_df["n_chunks"]
-        )
-        result_df["spread"] = result_df["spread"] / result_df["n_chunks"]
-        result_df = result_df.drop("n_chunks", axis=1)
 
         return result_df
 
@@ -375,50 +369,43 @@ class Duckdb_client:
 
     def __vss_thread_query(
         self,
-        queries_df: pd.DataFrame,
-        results: list,
+        queries_df: pl.DataFrame,
         collection_name: str,
         vector_dimensions: int,
         hnsw_metric_function: str = "array_distance",
         limit: int = 10,
-        thread_number: int = 0,
     ):
         thread_connection = self.connection.cursor()
 
         thread_connection.execute(
-            f"""CREATE OR REPLACE TABLE queries{thread_number} ( 
+            f"""CREATE OR REPLACE TEMP TABLE queries ( 
                 id INTEGER,
                 doc_id VARCHAR,
                 chunk_position INTEGER,
-                text VARCHAR,
+                n_chunks INTEGER,
                 embeddings FLOAT[{vector_dimensions}])"""
         )
 
-        thread_connection.execute(
-            f"INSERT INTO queries{thread_number} BY NAME SELECT * FROM queries_df"
-        )
+        thread_connection.execute("INSERT INTO queries BY NAME SELECT * FROM queries_df")
 
-        result = thread_connection.execute(
-            f"""SELECT queries{thread_number}.id, 
-            queries{thread_number}.doc_id,
-            queries{thread_number}.chunk_position,
-            list(idn) AS vss_matches,
-            list(is_prefLabel) AS is_prefLabels,
-            list(label_text) AS label_texts,
-            list(vss_score) AS vss_scores 
-            FROM queries{thread_number}, LATERAL (
+        thread_connection.execute(
+            f"""INSERT INTO results
+            SELECT queries.id, 
+            queries.doc_id,
+            queries.chunk_position,
+            queries.n_chunks,
+            idn AS label_id,
+            is_prefLabel,
+            (1 - score) AS score,
+            FROM queries, LATERAL (
                 SELECT {collection_name}.idn,
                 {collection_name}.is_prefLabel,
-                {collection_name}.label_text,
-                {hnsw_metric_function}(queries{thread_number}.embeddings, {collection_name}.embeddings) AS vss_score
+                {hnsw_metric_function}(queries.embeddings, {collection_name}.embeddings) AS score
                 FROM {collection_name}
-                ORDER BY vss_score
+                ORDER BY score
                 LIMIT {limit}
-            )
-            GROUP BY id, doc_id, chunk_position"""
-        ).df()
-
-        results.append(result)
+            )"""
+        )
 
     def __fts_thread_query(
         self,

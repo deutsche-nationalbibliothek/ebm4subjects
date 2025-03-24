@@ -8,7 +8,6 @@ from dvc.api import params_show
 from tqdm import tqdm
 
 from duckdb_client import Duckdb_client
-from generate_embeddings import generate_embeddings
 from utils import str2bool
 
 PREF_LABEL_IRI = "http://www.w3.org/2004/02/skos/core#prefLabel"
@@ -78,9 +77,7 @@ def run():
     embeddings = np.load(args.embeddings)
 
     if str2bool(args.overwrite):
-        vocab["embeddings"] = pd.Series(
-            embeddings.tolist()
-        )
+        vocab["embeddings"] = pd.Series(embeddings.tolist())
         vocab["id"] = [i for i in range(len(vocab["idn"].tolist()))]
 
         client.create_collection(

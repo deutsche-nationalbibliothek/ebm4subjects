@@ -2,7 +2,7 @@ import argparse
 import logging
 
 import numpy as np
-import pandas as pd
+import polars as pl
 from dvc.api import params_show
 
 from duckdb_client import Duckdb_client
@@ -68,47 +68,31 @@ if __name__ == "__main__":
     )
 
     logger.info("Reading chunks...")
-    with open(args.chunks, "r", encoding="utf-8") as file:
-        chunk_texts = file.readlines()
+    chunk_texts = open(args.chunks, "r", encoding="utf-8").readlines()
 
     logger.info("Reading chunk index...")
-    chunk_index = pd.read_feather(args.chunk_index)
-    chunk_positions = chunk_index["rel_chunk_position"].tolist()
-    doc_ids = chunk_index["doc_id"].tolist()
-    n_chunks_df = (
-        chunk_index.groupby("doc_id")
-        .agg(n_chunks=("rel_chunk_position", "count"))
-        .reset_index()
-    )
+    chunk_index = pl.read_ipc(args.chunk_index)
 
     logger.info("Reading chunk embeddings...")
     chunk_embdeddings = np.load(args.chunk_embeddings)
 
-    query_df = pd.DataFrame()
-    query_df["id"] = [i for i in range(len(chunk_texts))]
-    query_df["doc_id"] = doc_ids
-    query_df["chunk_position"] = chunk_positions
-    query_df["text"] = chunk_texts
-    query_df["embeddings"] = chunk_embdeddings[0 : len(chunk_texts), :].tolist()
-
-    # logger.info("Generating candidates with Hybrid Search...")
-    # hybrid_result = client.hybrid_search(
-    #     query_df=query_df,
-    #     n_chunks_df=n_chunks_df,
-    #     collection_name=collection_name,
-    #     vector_dimensions=embedding_dim,
-    #     n_jobs=args.n_jobs,
-    #     n_hits=args.n_hits,
-    #     alpha=args.alpha,
-    #     chunk_size=2048,
-    #     top_k=args.top_k,
-    #     hnsw_metric_function="array_cosine_distance",
-    # )
+    data = {
+        "id": [i for i in range(len(chunk_texts))],
+        "doc_id": chunk_index["doc_id"].to_list(),
+        "chunk_position": chunk_index["rel_chunk_position"].to_list(),
+        "embeddings": chunk_embdeddings[0 : len(chunk_texts), :].tolist(),
+    }
+    query_df = pl.DataFrame(data).join(
+        other=chunk_index.group_by("doc_id").agg(
+            pl.col("rel_chunk_position").count().alias("n_chunks")
+        ),
+        on="doc_id",
+        how="left",
+    )
 
     logger.info("Generating candidates with Vector Search...")
     vector_result = client.vector_search(
         query_df=query_df,
-        n_chunks_df=n_chunks_df,
         collection_name=collection_name,
         vector_dimensions=embedding_dim,
         n_jobs=args.n_jobs,
@@ -119,4 +103,4 @@ if __name__ == "__main__":
     )
 
     logger.info("Writing Outputs...")
-    vector_result.to_feather(args.output)
+    vector_result.write_ipc(args.output)
