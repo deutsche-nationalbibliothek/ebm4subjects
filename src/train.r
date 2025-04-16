@@ -68,6 +68,12 @@ option_list = list(
     help = "path to the output file",
     metavar = "character"
   ),
+  make_option(
+    c("--importance_plot"),
+    type = "character", default = "results/train/feature_importance.png",
+    help = "path to the output plot file",
+    metavar = "character"
+  ),
   make_option( 
     c("--n_jobs"), type = "integer", default = 20,
     help = "number of jobs to run in parallel",
@@ -138,6 +144,10 @@ bst <- xgboost(
 message("saving model...")
 saveRDS(bst, opt$model_file)
 
+message("plotting feature importance...")
+png(opt$importance_plot, res = 300, width = 1600, height = 1000)
+xgb.plot.importance(xgb.importance(model = bst))
+dev.off()
 # model_data_validate <- prepare_data(
 #   index_validate,
 #   gt,
