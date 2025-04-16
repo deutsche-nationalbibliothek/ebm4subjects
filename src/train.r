@@ -94,7 +94,8 @@ gnd_label_disribution <- read_feather(
 )
 
 index_train <- read_feather(opt$train_index)
-candidates_train <- read_feather(opt$train_candidates)
+candidates_train <- polars::pl$scan_ipc(opt$train_candidates)  |>
+  as.data.frame()
 
 message("preparing data...")
 model_data_train <- prepare_data(
