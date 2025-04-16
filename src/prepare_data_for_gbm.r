@@ -43,6 +43,7 @@ prepare_data <- function(
       gold_standard,
       candidates
     )  |>
+      filter(!(gold & !suggested))  |>
       left_join(label_disribution, by = "label_id", na_matches = "never")
 
     res <- res  |>
