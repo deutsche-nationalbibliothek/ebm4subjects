@@ -156,6 +156,7 @@ stages:
         --n_rounds ${train.xgb.n_rounds}
         --subsample ${train.xgb.subsample}
         --interaction_depth ${train.xgb.interaction_depth}
+        --importance_plot results/train/importance_plot.png
         --shrinkage ${train.xgb.shrinkage}
         --verbose ${train.xgb.verbose}
         --n_jobs ${train.xgb.n_jobs}
@@ -173,6 +174,8 @@ stages:
       - assets/gnd-label-distribution.arrow
     outs:
       - results/train/model.rds
+      - results/train/importance_plot.png:
+          cache: false
         
   rank_candidates:
     foreach:
