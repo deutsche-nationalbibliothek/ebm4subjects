@@ -68,6 +68,12 @@ option_list = list(
     help = "path to the output file",
     metavar = "character"
   ),
+  make_option(
+    c("--importance_plot"),
+    type = "character", default = "results/train/feature_importance.png",
+    help = "path to the output plot file",
+    metavar = "character"
+  ),
   make_option( 
     c("--n_jobs"), type = "integer", default = 20,
     help = "number of jobs to run in parallel",
@@ -94,7 +100,8 @@ gnd_label_disribution <- read_feather(
 )
 
 index_train <- read_feather(opt$train_index)
-candidates_train <- read_feather(opt$train_candidates)
+candidates_train <- polars::pl$scan_ipc(opt$train_candidates)  |>
+  as.data.frame()
 
 message("preparing data...")
 model_data_train <- prepare_data(
@@ -120,7 +127,7 @@ message("training model with parameters:\n n_trees = ", opt$n_trees,
         ",\n shrinkage = ", opt$shrinkage,
         ",\n verbose = ", opt$verbose)
 
-xgb_matrix <- model.matrix(~ hybrid_score + min_cosine_similarity + max_cosine_similarity + label_freq + occurrences + first_occurence + last_occurence + spread + is_prefLabel, data = model_data_train)
+xgb_matrix <- model.matrix(~ score + min_cosine_similarity + max_cosine_similarity + label_freq + occurrences + first_occurence + last_occurence + spread + is_prefLabel, data = model_data_train)
 
 bst <- xgboost(
   data = xgb.DMatrix(data = xgb_matrix, label = model_data_train$gold),
@@ -137,6 +144,10 @@ bst <- xgboost(
 message("saving model...")
 saveRDS(bst, opt$model_file)
 
+message("plotting feature importance...")
+png(opt$importance_plot, res = 300, width = 1600, height = 1000)
+xgb.plot.importance(xgb.importance(model = bst))
+dev.off()
 # model_data_validate <- prepare_data(
 #   index_validate,
 #   gt,

@@ -1,5 +1,5 @@
 general:
-  TEI_port: 8090
+  db_path: vocab/gnd.duckdb
   embedding_model: jinaai/jina-embeddings-v3
   embedding_dim: 1024
   batch_size: 1024
@@ -7,7 +7,7 @@ general:
 vocab_config:
   overwrite: true
   collection_name: gnd204k_w_altlabels_no_phrase_jina_1024_retrieval
-  phrase: ''
+  phrase: ""
   use_altLabels: true
   collection_copy: vocab/gnd204k_w_altlabels.arrow
   embeddings: vocab/embeddings.npy
@@ -42,4 +42,4 @@ task:
   name: ftoa
 
 collection:
-  overwrite: false
+  overwrite: true

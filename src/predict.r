@@ -66,7 +66,8 @@ bst <- readRDS(opt$model_file)
 # Load the test data
 message("loading data...")
 test_index <- read_feather(opt$test_index)
-test_candidates <- read_feather(opt$test_candidates)
+test_candidates <- polars::pl$scan_ipc(opt$test_candidates)  |>
+  as.data.frame()
 gnd_label_disribution <- read_feather(
   opt$label_distribution,
   col_select = c("label_id", "label_freq")
@@ -83,7 +84,7 @@ model_data <- prepare_data(
 )
 
 xgb_matrix <- model.matrix(
-  ~ hybrid_score + min_cosine_similarity + max_cosine_similarity + label_freq + occurrences + first_occurence + last_occurence + spread + is_prefLabel,
+  ~ score + min_cosine_similarity + max_cosine_similarity + label_freq + occurrences + first_occurence + last_occurence + spread + is_prefLabel,
   data = model_data
 )
 

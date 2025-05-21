@@ -43,6 +43,7 @@ prepare_data <- function(
       gold_standard,
       candidates
     )  |>
+      filter(!(gold & !suggested))  |>
       left_join(label_disribution, by = "label_id", na_matches = "never")
 
     res <- res  |>
@@ -50,11 +51,13 @@ prepare_data <- function(
       mutate(gold = ifelse(gold, 1.0, 0.0))  |>
       select(
         gold,
-        hybrid_score,
+        score,
         min_cosine_similarity,
         max_cosine_similarity, 
         label_freq,
         occurrences,
+        max_cosine_similarity,
+        min_cosine_similarity,
         first_occurence,
         last_occurence,
         spread,
@@ -83,11 +86,13 @@ prepare_data <- function(
       select(
         doc_id,
         label_id,
-        hybrid_score,
+        score,
         min_cosine_similarity,
         max_cosine_similarity, 
         label_freq,
         occurrences,
+        max_cosine_similarity,
+        min_cosine_similarity,
         first_occurence,
         last_occurence,
         spread,
