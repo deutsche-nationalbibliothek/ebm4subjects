@@ -12,8 +12,8 @@
       "args": [
         "--chunks", "results/test/chunks.txt",
         "--chunk_index", "results/test/chunk_index.arrow",
-        "--chunk_emnbeddings", "results/test/chunk_embeddings.pkl",
-        "--alpha", "0.5",
+        "--chunk_embeddings", "results/test/chunk_embeddings.npy",
+        "--alpha", "1.0",
         "--top_k", "100",
         "--n_hits", "20",
         "--n_jobs", "4",

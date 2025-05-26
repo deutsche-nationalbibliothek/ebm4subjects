@@ -2,7 +2,7 @@ import argparse
 import logging
 
 import numpy as np
-import pandas as pd
+import polars as pl
 from dvc.api import params_show
 
 from duckdb_client import Duckdb_client
@@ -68,70 +68,39 @@ if __name__ == "__main__":
     )
 
     logger.info("Reading chunks...")
-    with open(args.chunks, "r", encoding="utf-8") as file:
-        chunk_texts = file.readlines()
+    chunk_texts = open(args.chunks, "r", encoding="utf-8").readlines()
 
     logger.info("Reading chunk index...")
-    chunk_index = pd.read_feather(args.chunk_index)
-    chunk_positions = chunk_index["rel_chunk_position"].tolist()
-    doc_ids = chunk_index["doc_id"].tolist()
-    n_chunks_df = (
-        chunk_index.groupby("doc_id")
-        .agg(n_chunks=("rel_chunk_position", "count"))
-        .reset_index()
-    )
+    chunk_index = pl.read_ipc(args.chunk_index)
 
     logger.info("Reading chunk embeddings...")
     chunk_embdeddings = np.load(args.chunk_embeddings)
 
-    input_df = pd.DataFrame()
-    input_df["id"] = [i for i in range(len(chunk_texts))]
-    input_df["doc_id"] = doc_ids
-    input_df["chunk_position"] = chunk_positions
-    input_df["text"] = chunk_texts
-    input_df["embeddings"] = chunk_embdeddings[0 : len(chunk_texts), :].tolist()
-
-    query_dfs = [input_df[i : i + 2048] for i in range(0, input_df.shape[0], 2048)]
-
-    result_dfs = []
-    logger.info("Generating candidates with Hybrid Search...")
-    for query_df in query_dfs:
-        result_dfs.append(
-            client.query_collection(
-                query_df=query_df,
-                collection_name=collection_name,
-                vector_dimensions=embedding_dim,
-                n_jobs=args.n_jobs,
-                n_hits=args.n_hits,
-                alpha=args.alpha,
-                hnsw_metric_function="array_cosine_distance",
-            )
-        )
-
-    result = pd.concat(result_dfs, ignore_index=True)
-    result = (
-        result.groupby(["doc_id", "label_id"])
-        .agg(
-            score=("score", "sum"),
-            occurrences=("doc_id", "count"),
-            first_occurence=("chunk_position", "min"),
-            last_occurence=("chunk_position", "max"),
-            spread=("chunk_position", lambda x: x.max() - x.min()),
-            is_prefLabel=("is_prefLabel", "any"),
-        )
-        .reset_index()
+    data = {
+        "id": [i for i in range(len(chunk_texts))],
+        "doc_id": chunk_index["doc_id"].to_list(),
+        "chunk_position": chunk_index["rel_chunk_position"].to_list(),
+        "embeddings": chunk_embdeddings[0 : len(chunk_texts), :].tolist(),
+    }
+    query_df = pl.DataFrame(data).join(
+        other=chunk_index.group_by("doc_id").agg(
+            pl.col("rel_chunk_position").count().alias("n_chunks")
+        ),
+        on="doc_id",
+        how="left",
     )
-    result = (
-        result.sort_values(["score"], ascending=False)
-        .groupby("doc_id")
-        .head(args.top_k)
+
+    logger.info("Generating candidates with Vector Search...")
+    vector_result = client.vector_search(
+        query_df=query_df,
+        collection_name=collection_name,
+        vector_dimensions=embedding_dim,
+        n_jobs=args.n_jobs,
+        n_hits=args.n_hits,
+        chunk_size=2048,
+        top_k=args.top_k,
+        hnsw_metric_function="array_cosine_distance",
     )
-    result = pd.merge(result, n_chunks_df, on="doc_id", how="left")
-    result["score"] = result["score"] / result["n_chunks"]
-    result["first_occurence"] = result["first_occurence"] / result["n_chunks"]
-    result["last_occurence"] = result["last_occurence"] / result["n_chunks"]
-    result["spread"] = result["spread"] / result["n_chunks"]
-    result = result.drop("n_chunks", axis=1)
 
     logger.info("Writing Outputs...")
-    result.to_feather(args.output)
+    vector_result.write_ipc(args.output)

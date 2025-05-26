@@ -1,25 +1,26 @@
 general:
-  db_path: gnd.duckdb
+  db_path: vocab/gnd.duckdb
   embedding_model: jinaai/jina-embeddings-v3
   embedding_dim: 1024
   batch_size: 1024
 
 vocab_config:
-  overwrite: false
+  overwrite: true
   collection_name: gnd204k_w_altlabels_no_phrase_jina_1024_retrieval
   phrase: ""
   use_altLabels: true
   collection_copy: vocab/gnd204k_w_altlabels.arrow
+  embeddings: vocab/embeddings.npy
 
 chunk_opts:
-  chunk_size: 100
+  chunk_size: 50
   max_chunks: 100
   max_docs: 30000
-  max_sentences_per_doc: 600
+  max_sentences_per_doc: 10000
   n_jobs: 10
 
 search:
-  alpha: 0.625
+  alpha: 1.0
   top_k: 100
   n_hits: 20
   n_jobs: 40

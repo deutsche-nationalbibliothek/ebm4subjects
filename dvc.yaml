@@ -7,31 +7,48 @@ stages:
     outs:
       - vocab/gnd_pref_labels.arrow
 
-  create_vocab_collection:
+  create_vocab_embeddings:
     cmd: 
       - > 
-        python src/create_vocab_collection.py \
+        python src/create_vocab_embeddings.py \
           --ttl_file vocab/gnd.ttl \
-          --collection_name ${vocab_config.collection_name} \
-          --overwrite ${vocab_config.overwrite} \
-          --db_path ${general.db_path} \
           --phrase "${vocab_config.phrase}" \
           --use_altLabels ${vocab_config.use_altLabels} \
-          --arrow_out ${vocab_config.collection_copy}
+          --arrow_out ${vocab_config.collection_copy} \
+          --embeddings_out ${vocab_config.embeddings}
     deps:
-      - src/create_vocab_collection.py
+      - src/create_vocab_embeddings.py
       - src/generate_embeddings.py
       - vocab/gnd.ttl
     params:
-      - vocab_config.collection_name
-      - vocab_config.overwrite
-      - general.db_path
       - general.embedding_model
       - general.embedding_dim
       - vocab_config.phrase
       - vocab_config.use_altLabels
     outs:
       - ${vocab_config.collection_copy}
+      - ${vocab_config.embeddings}
+
+  create_vocab_collection:
+    cmd: 
+      - > 
+        python src/create_vocab_collection.py \
+          --arrow_in ${vocab_config.collection_copy} \
+          --embeddings ${vocab_config.embeddings} \
+          --collection_name ${vocab_config.collection_name} \
+          --overwrite ${vocab_config.overwrite} \
+          --db_path ${general.db_path} 
+    deps:
+      - src/create_vocab_collection.py
+      - src/duckdb_client.py
+      - ${vocab_config.collection_copy}
+      - ${vocab_config.embeddings}
+    params:
+      - vocab_config.collection_name
+      - vocab_config.overwrite
+      - general.db_path
+    outs:
+      - ${general.db_path}
 
   chunk_texts:
     foreach:
@@ -94,10 +111,12 @@ stages:
       - test
     do:
       cmd: 
+        - cp ${general.db_path} vocab/tmp_db.duckdb
+        - chmod +w vocab/tmp_db.duckdb
         - mkdir -p results/${item}/
         - >
           python src/index_corpus.py 
-          --db_path ${general.db_path}
+          --db_path vocab/tmp_db.duckdb
           --chunks results/${item}/chunks.txt
           --chunk_index results/${item}/chunk_index.arrow 
           --chunk_embeddings results/${item}/chunk_embeddings.npy
@@ -106,19 +125,21 @@ stages:
           --n_hits ${search.n_hits}
           --output results/${item}/candidates.arrow
           --n_jobs ${search.n_jobs}
+        - rm vocab/tmp_db.duckdb
       deps:
         - src/index_corpus.py
+        - src/duckdb_client.py
         - results/${item}/chunk_index.arrow 
         - results/${item}/chunk_embeddings.npy
         - results/${item}/chunks.txt
         - ${vocab_config.collection_copy}
+        - ${general.db_path}
       params:
         - vocab_config.collection_name 
         - search.alpha
         - search.top_k
         - search.n_hits
         - task.name
-        - general.db_path
       outs:
         - results/${item}/candidates.arrow
 
@@ -135,6 +156,7 @@ stages:
         --n_rounds ${train.xgb.n_rounds}
         --subsample ${train.xgb.subsample}
         --interaction_depth ${train.xgb.interaction_depth}
+        --importance_plot results/train/importance_plot.png
         --shrinkage ${train.xgb.shrinkage}
         --verbose ${train.xgb.verbose}
         --n_jobs ${train.xgb.n_jobs}
