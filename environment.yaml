@@ -23,6 +23,7 @@ dependencies:
   - pyoxigraph
   - transformers
   - duckdb
+  - xgboost
   # dependencies for jina-ai embeddings
   - einops
   - ninja

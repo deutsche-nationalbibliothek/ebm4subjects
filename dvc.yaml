@@ -147,16 +147,15 @@ stages:
     cmd:
       - mkdir -p results/train/
       - >
-        Rscript src/train.r --ground_truth corpora/ground-truth.arrow
+        python src/train.py --ground_truth corpora/ground-truth.arrow
         --train_index corpora/${task.name}/train.arrow
         --max_docs ${chunk_opts.max_docs}
         --train_candidates results/train/candidates.arrow
         --label_distribution assets/gnd-label-distribution.arrow
-        --model_file results/train/model.rds
+        --model_file results/train/model.pkl
         --n_rounds ${train.xgb.n_rounds}
         --subsample ${train.xgb.subsample}
         --interaction_depth ${train.xgb.interaction_depth}
-        --importance_plot results/train/importance_plot.png
         --shrinkage ${train.xgb.shrinkage}
         --verbose ${train.xgb.verbose}
         --n_jobs ${train.xgb.n_jobs}
@@ -166,16 +165,14 @@ stages:
       - train.xgb.shrinkage
       - train.xgb.subsample
     deps:
-      - src/train.r
-      - src/prepare_data_for_gbm.r
+      - src/train.py
+      - src/prepare_data_for_gbm.py
       - corpora/ground-truth.arrow
       - corpora/${task.name}/train.arrow
       - results/train/candidates.arrow
       - assets/gnd-label-distribution.arrow
     outs:
-      - results/train/model.rds
-      - results/train/importance_plot.png:
-          cache: false
+      - results/train/model.pkl
         
   rank_candidates:
     foreach:
@@ -185,8 +182,8 @@ stages:
       cmd:
         - mkdir -p results/${item}/
         - >
-          Rscript src/predict.r 
-          --model_file results/train/model.rds
+          python src/predict.py 
+          --model_file results/train/model.pkl
           --test_index corpora/${task.name}/${item}.arrow
           --test_candidates results/${item}/candidates.arrow
           --max_docs ${chunk_opts.max_docs}
@@ -197,9 +194,9 @@ stages:
         - predict.top_k
         - chunk_opts.max_docs
       deps:
-        - src/predict.r
-        - src/prepare_data_for_gbm.r
-        - results/train/model.rds
+        - src/predict.py
+        - src/prepare_data_for_gbm.py
+        - results/train/model.pkl
         - corpora/${task.name}/${item}.arrow
         - results/${item}/candidates.arrow
         - assets/gnd-label-distribution.arrow
