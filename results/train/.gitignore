@@ -4,3 +4,4 @@
 /chunks.txt
 /chunk_embeddings.pkl
 /chunk_embeddings.npy
+/model.pkl
