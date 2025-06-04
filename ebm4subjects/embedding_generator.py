@@ -19,7 +19,7 @@ class EmbeddingGenerator:
         texts: list[str],
         batch_size: int = 1,
         task: str = "text-matching",
-    ):
+    ) -> np.ndarray:
         embeddings = []
 
         with torch.no_grad():
@@ -31,5 +31,5 @@ class EmbeddingGenerator:
                         task=task,
                     )
                 )
-                
+
         return np.concatenate(embeddings)
