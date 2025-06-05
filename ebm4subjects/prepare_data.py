@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import numpy as np
 import polars as pl
 import pyoxigraph
 
@@ -10,8 +9,8 @@ PREF_LABEL_IRI = "http://www.w3.org/2004/02/skos/core#prefLabel"
 ALT_LABEL_IRI = "http://www.w3.org/2004/02/skos/core#altLabel"
 
 
-def parse_vocab(ttl_path: Path, use_altLabels: bool = True) -> pl.DataFrame:
-    with ttl_path.open("rb") as in_file:
+def parse_vocab(vocab_path: Path, use_altLabels: bool = True) -> pl.DataFrame:
+    with vocab_path.open("rb") as in_file:
         graph = pyoxigraph.parse(input=in_file, format=pyoxigraph.RdfFormat.TURTLE)
         idns = []
         label_texts = []
@@ -30,21 +29,17 @@ def parse_vocab(ttl_path: Path, use_altLabels: bool = True) -> pl.DataFrame:
                 label_texts.append(label_text)
                 pref_labels.append(True)
 
-    return pl.DataFrame({"idn": idns, "label_text": label_texts, "is_prefLabel": pref_labels})
+    return pl.DataFrame(
+        {"idn": idns, "label_text": label_texts, "is_prefLabel": pref_labels}
+    )
 
 
-def create_vocab_embeddings(
-    ttl_path: Path,
-    vocab_out: Path,
-    embeddings_out: Path,
+def add_vocab_embeddings(
+    vocab: pl.DataFrame,
     model_name: str,
     embedding_dimensions: int,
     batch_size: int = 1,
-    use_altLabels: bool = True,
 ):
-    vocab = parse_vocab(ttl_path, use_altLabels)
-    vocab.write_ipc(vocab_out)
-
     generator = EmbeddingGenerator(model_name, embedding_dimensions)
 
     embeddings = generator.generate_embeddings(
@@ -52,4 +47,10 @@ def create_vocab_embeddings(
         batch_size=batch_size,
         task="retrieval.query",
     )
-    np.save(embeddings_out, embeddings)
+
+    vocab = vocab.with_columns(
+        pl.Series(name="embeddings", values=embeddings.tolist()),
+        pl.Series(name="id", values=[i for i in range(vocab.height)]),
+    )
+
+    return vocab
