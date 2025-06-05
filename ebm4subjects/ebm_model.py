@@ -1,0 +1,132 @@
+from pathlib import Path
+
+import polars as pl
+
+from ebm4subjects import prepare_data
+from ebm4subjects.chunker import Chunker
+from ebm4subjects.duckdb_client import Duckdb_client
+from ebm4subjects.embedding_generator import EmbeddingGenerator
+
+
+class EbmModel:
+    def __init__(
+        self,
+        db_path: Path,
+        use_altLabels: bool,
+        embedding_model_name: str,
+        embedding_dimensions: int,
+        embedding_batch_size: int,
+        max_chunks: int,
+        max_chunk_size: int,
+        max_sentences: int,
+        max_query_hits: int,
+        query_top_k: int,
+        query_jobs: int,
+    ) -> None:
+        self.client = Duckdb_client(
+            db_path=db_path,
+            config={"hnsw_enable_experimental_persistence": True},
+        )
+
+        self.chunker = Chunker(
+            max_chunks=max_chunks,
+            max_chunk_size=max_chunk_size,
+            max_sentences=max_sentences,
+        )
+
+        self.use_altLabels = use_altLabels
+
+        self.embedding_model_name = embedding_model_name
+        self.embedding_dimensions = embedding_dimensions
+        self.embedding_batch_size = embedding_batch_size
+
+        self.max_query_hits = max_query_hits
+        self.query_top_k = query_top_k   
+        self.query_jobs = query_jobs     
+
+    def create_vector_db(
+        self,
+        vocab_in_path: Path,
+        vocab_out_path: Path | None,
+        collection_name: str = "my_collection",
+        force: bool = False,
+    ):
+        collection_df = prepare_data.add_vocab_embeddings(
+            vocab=prepare_data.parse_vocab(
+                vocab_path=vocab_in_path,
+                use_altLabels=self.use_altLabels,
+            ),
+            model_name=self.embedding_model_name,
+            embedding_dimensions=self.embedding_dimensions,
+            batch_size=self.embedding_batch_size,
+        )
+
+        if vocab_out_path:
+            collection_df.write_ipc(vocab_out_path)
+
+        self.client.create_collection(
+            collection_df=collection_df,
+            collection_name=collection_name,
+            embedding_dimensions=self.embedding_dimensions,
+            hnsw_index_name="hnsw_index",
+            hnsw_metric="cosine",
+            force=force,
+        )
+
+    def _prepare_train_data(self):
+        pass
+
+    def prepare_train(self):
+        pass
+
+    def train(self):
+        pass
+
+    def generate_candidates(
+        self,
+        text: str,
+        doc_id: int,
+        collection_name: str,
+    ):
+        text_chunks = self.chunker.chunk_text(text)
+
+        embedding_generator = EmbeddingGenerator(
+            model_name=self.embedding_model_name,
+            embedding_dimensions=self.embedding_dimensions,
+        )
+
+        query_df = pl.DataFrame(
+            {
+                "id": [i + 1 for i in range(len(text_chunks))],
+                "doc_id": [doc_id for i in range(len(text_chunks))],
+                "chunk_position": [i + 1 for i in range(len(text_chunks))],
+                "n_chunks": [len(text_chunks) for _ in range(len(text_chunks))],
+                "embeddings": embedding_generator.generate_embeddings(
+                    texts=text_chunks,
+                    batch_size=self.embedding_batch_size,
+                    task="retrieval.passage",
+                ),
+            }
+        )
+
+        candidates_df = self.client.vector_search(
+            query_df=query_df,
+            collection_name=collection_name,
+            embedding_dimensions=self.embedding_dimensions,
+            n_jobs=self.query_jobs,
+            n_hits=self.max_query_hits,
+            chunk_size=1024,
+            top_k=self.query_top_k,
+            hnsw_metric_function="array_cosine_distance",
+        )
+
+        return candidates_df
+
+    def predict(self):
+        pass
+
+    def load(self):
+        pass
+
+    def save(self):
+        pass
