@@ -21,8 +21,8 @@ class Duckdb_client:
     def create_collection(
         self,
         collection_df: pl.DataFrame,
-        collection_name: str = "gnd",
-        vector_dimensions: int = 1024,
+        collection_name: str = "my_collection",
+        embedding_dimensions: int = 1024,
         hnsw_index_name: str = "hnsw_index",
         hnsw_metric: str = "l2sq",
         force: bool = False,
@@ -37,7 +37,7 @@ class Duckdb_client:
                 idn VARCHAR,
                 label_text VARCHAR,
                 is_prefLabel BOOLEAN,
-                embeddings FLOAT[{vector_dimensions}])"""
+                embeddings FLOAT[{embedding_dimensions}])"""
         )
 
         self.connection.execute(
@@ -57,7 +57,7 @@ class Duckdb_client:
         self,
         query_df: pl.DataFrame,
         collection_name: str,
-        vector_dimensions: int,
+        embedding_dimensions: int,
         n_jobs: int = 1,
         n_hits: int = 10,
         chunk_size: int = 2048,
@@ -87,7 +87,7 @@ class Duckdb_client:
                         args=(
                             df,
                             collection_name,
-                            vector_dimensions,
+                            embedding_dimensions,
                             hnsw_metric_function,
                             n_hits,
                         ),
