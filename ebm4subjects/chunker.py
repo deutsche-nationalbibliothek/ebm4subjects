@@ -14,7 +14,7 @@ class Chunker:
 
         self.tokenizer = nltk.data.load("tokenizers/punkt/german.pickle")
 
-    def chunk_text(self, text: str, doc_id: int) -> list[(str, int)]:
+    def chunk_text(self, text: str) -> list[str]:
         chunks = []
         sentences = self.tokenizer.tokenize(text)
         sentences = sentences[: self.max_sentences]
@@ -24,19 +24,12 @@ class Chunker:
             if len(" ".join(current_chunk)) < self.max_chunk_size:
                 current_chunk.append(sentence)
             else:
-                chunks.append((" ".join(current_chunk), doc_id))
+                chunks.append(" ".join(current_chunk))
                 current_chunk = [sentence]
                 if len(chunks) == self.max_chunks:
                     break
 
         if current_chunk and len(chunks) < self.max_chunks:
-            chunks.append((" ".join(current_chunk), doc_id))
+            chunks.append(" ".join(current_chunk))
 
         return chunks
-
-    def process_batch(self, texts, doc_ids):
-        chunked_texts = []
-        for text, doc_id in zip(texts, doc_ids):
-            chunked_texts.extend(self.chunk_text(text, doc_id))
-
-        return chunked_texts
