@@ -313,5 +313,13 @@ class EbmModel:
     def load(self, input_path: Path) -> None:
         self.model = pickle.load(open(input_path, "rb"))
 
-    def save(self, output_path: Path) -> None:
-        pickle.dump(self.model, open(output_path, "wb"))
+    def save(self, output_path: Path, force: bool = False) -> None:
+        if output_path.exists():
+            return
+        else:
+            try:
+                pickle.dump(self.model, open(output_path, "wb"))
+            except FileNotFoundError:
+                return
+            except PermissionError:
+                return
