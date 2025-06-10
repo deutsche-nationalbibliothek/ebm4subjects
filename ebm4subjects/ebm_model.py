@@ -206,17 +206,17 @@ class EbmModel:
         doc_id: int,
         collection_name: str,
     ) -> pl.DataFrame:
-        text_chunks = self.chunker.chunk_text(text)
-
         embedding_generator = EmbeddingGenerator(
             model_name=self.embedding_model_name,
             embedding_dimensions=self.embedding_dimensions,
         )
 
+        text_chunks = self.chunker.chunk_text(text)
+
         query_df = pl.DataFrame(
             {
                 "id": [i + 1 for i in range(len(text_chunks))],
-                "doc_id": [doc_id for i in range(len(text_chunks))],
+                "doc_id": [doc_id for _ in range(len(text_chunks))],
                 "chunk_position": [i + 1 for i in range(len(text_chunks))],
                 "n_chunks": [len(text_chunks) for _ in range(len(text_chunks))],
                 "embeddings": embedding_generator.generate_embeddings(
@@ -229,6 +229,53 @@ class EbmModel:
 
         return self.client.vector_search(
             query_df=query_df,
+            collection_name=collection_name,
+            embedding_dimensions=self.embedding_dimensions,
+            n_jobs=self.query_jobs,
+            n_hits=self.max_query_hits,
+            chunk_size=1024,
+            top_k=self.query_top_k,
+            hnsw_metric_function="array_cosine_distance",
+        )
+
+    def generate_candidates_batch(
+        self,
+        texts: list[str],
+        doc_ids: list[int],
+        collection_name: str,
+    ):
+        embedding_generator = EmbeddingGenerator(
+            model_name=self.embedding_model_name,
+            embedding_dimensions=self.embedding_dimensions,
+        )
+
+        text_chunks = []
+        for text in texts:
+            text_chunks.append(self.chunker.chunk_text(text))
+
+        query_dfs = []
+        id_count = 1
+        for doc_id, chunks in zip(doc_ids, text_chunks):
+            query_dfs.append(
+                pl.DataFrame(
+                    {
+                        "id": [i + id_count for i in range(len(chunks))],
+                        "doc_id": [doc_id for _ in range(len(chunks))],
+                        "chunk_position": [i + 1 for i in range(len(chunks))],
+                        "n_chunks": [len(chunks) for _ in range(len(chunks))],
+                        "embeddings": embedding_generator.generate_embeddings(
+                            texts=chunks,
+                            batch_size=self.embedding_batch_size,
+                            task="retrieval.passage",
+                        ),
+                    }
+                )
+            )
+
+            id_count += len(chunks)
+
+        return self.client.vector_search(
+            query_df=pl.concat(query_dfs),
             collection_name=collection_name,
             embedding_dimensions=self.embedding_dimensions,
             n_jobs=self.query_jobs,
@@ -257,7 +304,7 @@ class EbmModel:
         return (
             candiates.with_columns(pl.Series(self.model.predict(matrix)).alias("score"))
             .select(["doc_id", "label_id", "score"])
-            .sort(["doc_id", "score"], descending=[True, True])
+            .sort(["doc_id", "score"], descending=[False, True])
             .group_by("doc_id")
             .agg(pl.all().head(self.query_top_k))
             .explode(["label_id", "score"])
