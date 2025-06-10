@@ -114,19 +114,18 @@ class EbmModel:
         candidates: pl.DataFrame,
         gold_standard: pl.DataFrame,
     ) -> pl.DataFrame:
-        candidates = candidates.with_columns(pl.lit(True).alias("suggested"))
-        gold_standard = gold_standard.with_columns(pl.lit(True).alias("gold"))
-
-        comparison = candidates.join(
-            other=gold_standard,
-            on=["doc_id", "label_id"],
-            how="outer",
-        ).with_columns(
-            pl.col("suggested").fill_null(False),
-            pl.col("gold").fill_null(False),
+        return (
+            candidates.with_columns(pl.lit(True).alias("suggested"))
+            .join(
+                other=gold_standard.with_columns(pl.lit(True).alias("gold")),
+                on=["doc_id", "label_id"],
+                how="outer",
+            )
+            .with_columns(
+                pl.col("suggested").fill_null(False),
+                pl.col("gold").fill_null(False),
+            )
         )
-
-        return comparison
 
     def prepare_train(
         self,
@@ -149,7 +148,7 @@ class EbmModel:
             }
         )
 
-        train_data = (
+        return (
             self._compare_to_gold_standard(train_candidates, gold_standard)
             .with_columns(pl.when(pl.col("gold")).then(1).otherwise(0).alias("gold"))
             .filter(pl.col("doc_id").is_not_null())
@@ -168,9 +167,7 @@ class EbmModel:
             )
         )
 
-        return train_data
-
-    def train(self, train_data: pl.DataFrame) -> xgb.Booster:
+    def train(self, train_data: pl.DataFrame) -> None:
         xgb_matrix = train_data.select(
             [
                 "score",
@@ -184,7 +181,7 @@ class EbmModel:
             ]
         )
 
-        dtrain = xgb.DMatrix(xgb_matrix.to_pandas(), train_data.to_pandas()["gold"])
+        matrix = xgb.DMatrix(xgb_matrix.to_pandas(), train_data.to_pandas()["gold"])
 
         model = xgb.train(
             params={
@@ -196,9 +193,9 @@ class EbmModel:
                 "verbosity": self.train_verbosity,
                 "nthread": self.train_jobs,
             },
-            dtrain=dtrain,
+            dtrain=matrix,
             num_boost_round=self.train_rounds,
-            evals=[(dtrain, "train")],
+            evals=[(matrix, "train")],
         )
 
         self.model = model
@@ -230,7 +227,7 @@ class EbmModel:
             }
         )
 
-        candidates_df = self.client.vector_search(
+        return self.client.vector_search(
             query_df=query_df,
             collection_name=collection_name,
             embedding_dimensions=self.embedding_dimensions,
@@ -240,8 +237,6 @@ class EbmModel:
             top_k=self.query_top_k,
             hnsw_metric_function="array_cosine_distance",
         )
-
-        return candidates_df
 
     def predict(self, candiates: pl.DataFrame) -> pl.DataFrame:
         matrix = xgb.DMatrix(
@@ -268,7 +263,7 @@ class EbmModel:
             .explode(["label_id", "score"])
         )
 
-    def load(self, input_path: Path) -> xgb.Booster:
+    def load(self, input_path: Path) -> None:
         self.model = pickle.load(open(input_path, "rb"))
 
     def save(self, output_path: Path) -> None:
