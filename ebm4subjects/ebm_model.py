@@ -59,6 +59,8 @@ class EbmModel:
         self.train_verbosity = train_verbosity
         self.train_jobs = train_jobs
 
+        self.model = None
+
     def create_vector_db(
         self,
         vocab_in_path: Path,
@@ -155,6 +157,8 @@ class EbmModel:
                 [
                     "score",
                     "occurrences",
+                    "min_cosine_similarity",
+                    "max_cosine_similarity",
                     "first_occurence",
                     "last_occurence",
                     "spread",
@@ -171,6 +175,8 @@ class EbmModel:
             [
                 "score",
                 "occurrences",
+                "min_cosine_similarity",
+                "max_cosine_similarity",
                 "first_occurence",
                 "last_occurence",
                 "spread",
@@ -195,7 +201,7 @@ class EbmModel:
             evals=[(dtrain, "train")],
         )
 
-        return model
+        self.model = model
 
     def generate_candidates(
         self,
@@ -237,11 +243,33 @@ class EbmModel:
 
         return candidates_df
 
-    def predict(self):
-        pass
+    def predict(self, candiates: pl.DataFrame) -> pl.DataFrame:
+        matrix = xgb.DMatrix(
+            candiates.select(
+                [
+                    "score",
+                    "occurrences",
+                    "min_cosine_similarity",
+                    "max_cosine_similarity",
+                    "first_occurence",
+                    "last_occurence",
+                    "spread",
+                    "is_prefLabel",
+                ]
+            )
+        )
+
+        return (
+            candiates.with_columns(pl.Series(self.model.predict(matrix)).alias("score"))
+            .select(["doc_id", "label_id", "score"])
+            .sort(["doc_id", "score"], descending=[True, True])
+            .group_by("doc_id")
+            .agg(pl.all().head(self.query_top_k))
+            .explode(["label_id", "score"])
+        )
 
     def load(self, input_path: Path) -> xgb.Booster:
-        return pickle.load(input_path)
+        self.model = pickle.load(open(input_path, "rb"))
 
-    def save(self, model:xgb.Booster, output_path: Path) -> None:
-        pickle.dump(model, open(output_path, "wb"))
+    def save(self, output_path: Path) -> None:
+        pickle.dump(self.model, open(output_path, "wb"))
