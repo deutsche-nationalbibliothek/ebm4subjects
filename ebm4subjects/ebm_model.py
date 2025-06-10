@@ -320,7 +320,7 @@ class EbmModel:
                 return
 
     def save(self, output_path: Path, force: bool = False) -> None:
-        if output_path.exists():
+        if output_path.exists() and not force:
             return
         else:
             try:
