@@ -1,5 +1,5 @@
-from pathlib import Path
 import pickle
+from pathlib import Path
 
 import polars as pl
 import xgboost as xgb
@@ -124,6 +124,91 @@ class EbmModel:
             .with_columns(
                 pl.col("suggested").fill_null(False),
                 pl.col("gold").fill_null(False),
+            )
+        )
+
+    def _read_long_document_format(
+        self,
+        path_to_document_file: Path,
+        path_to_index_file: Path,
+    ) -> pl.DataFrame:
+        documents = (
+            pl.read_csv(
+                path_to_document_file,
+                has_header=False,
+                separator="\t",
+            )
+            .with_row_index()
+            .with_columns(pl.col("column_2").str.split(" "))
+            .explode("column_2")
+        )
+
+        index = pl.read_ipc(path_to_index_file)
+
+        return (
+            documents.join(
+                other=index,
+                left_on="index",
+                right_on="location",
+                how="inner",
+            )
+            .select(["column_1", "column_2", "idn"])
+            .rename({"column_1": "text", "column_2": "label_id"})
+        )
+
+    def prepare_train_from_docs(
+        self,
+        path_to_document_file: Path,
+        path_to_index_file: Path,
+        collection_name: str = "my_collection",
+    ) -> pl.DataFrame:
+        try:
+            documents = self._read_long_document_format(
+                path_to_document_file,
+                path_to_index_file,
+            )
+        except FileNotFoundError:
+            return
+        except PermissionError:
+            return
+
+        train_texts = documents.get_column("text").to_list()
+        train_doc_ids = documents.get_column("idn").to_list()
+        gold_label_ids = [
+            label_id.split("/")[4][:-1]
+            for label_id in documents.get_column("label_id").to_list()
+        ]
+        gold_doc_ids = documents.get_column("idn").to_list()
+
+        train_candidates = self._prepare_train_data(
+            texts=train_texts,
+            doc_ids=train_doc_ids,
+            collection_name=collection_name,
+        )
+
+        gold_standard = pl.DataFrame(
+            {
+                "doc_id": gold_doc_ids,
+                "label_id": gold_label_ids,
+            }
+        )
+
+        return (
+            self._compare_to_gold_standard(train_candidates, gold_standard)
+            .with_columns(pl.when(pl.col("gold")).then(1).otherwise(0).alias("gold"))
+            .filter(pl.col("doc_id").is_not_null())
+            .select(
+                [
+                    "score",
+                    "occurrences",
+                    "min_cosine_similarity",
+                    "max_cosine_similarity",
+                    "first_occurence",
+                    "last_occurence",
+                    "spread",
+                    "is_prefLabel",
+                    "gold",
+                ]
             )
         )
 
@@ -285,9 +370,9 @@ class EbmModel:
             hnsw_metric_function="array_cosine_distance",
         )
 
-    def predict(self, candiates: pl.DataFrame) -> pl.DataFrame:
+    def predict(self, candidates: pl.DataFrame) -> pl.DataFrame:
         matrix = xgb.DMatrix(
-            candiates.select(
+            candidates.select(
                 [
                     "score",
                     "occurrences",
@@ -302,7 +387,9 @@ class EbmModel:
         )
 
         return (
-            candiates.with_columns(pl.Series(self.model.predict(matrix)).alias("score"))
+            candidates.with_columns(
+                pl.Series(self.model.predict(matrix)).alias("score")
+            )
             .select(["doc_id", "label_id", "score"])
             .sort(["doc_id", "score"], descending=[False, True])
             .group_by("doc_id")
