@@ -5,24 +5,34 @@ description = ""
 authors = [
     {name = "Clemens Rietdorf",email = "c.rietdorf@dnb.de"}
 ]
+
 readme = "README.md"
-requires-python = ">=3.12"
+
+requires-python = ">=3.11"
 dependencies = [
-    "pytest (>=8.3.5,<9.0.0)",
-    "torch (>=2.7.0,<3.0.0)",
-    "numpy (>=2.2.6,<3.0.0)",
-    "transformers (>=4.52.4,<5.0.0)",
-    "einops (>=0.8.1,<0.9.0)",
-    "pyoxigraph (>=0.4.11,<0.5.0)",
-    "pandas (>=2.2.3,<3.0.0)",
-    "pyarrow (>=20.0.0,<21.0.0)",
-    "duckdb (>=1.3.0,<2.0.0)",
-    "polars (>=1.30.0,<2.0.0)",
-    "nltk (>=3.9.1,<4.0.0)",
-    "xgboost (>=3.0.2,<4.0.0)"
+    "duckdb>=1.3.0",
+    "editables>=0.5",
+    "einops>=0.8.1",
+    "hatchling>=1.27.0",
+    "nltk>=3.9.1",
+    "numpy>=2.2.6",
+    "pandas>=2.3.0",
+    "polars>=1.30.0",
+    "pyarrow>=20.0.0",
+    "pyoxigraph>=0.4.11",
+    "pytest>=8.4.0",
+    "setuptools>=80.9.0",
+    "torch>=2.7.1",
+    "transformers>=4.52.4",
+    "xgboost>=3.0.2",
 ]
 
+[tool.uv]
+no-build-isolation-package = ["flash-attn", "setuptools"]
+
+[project.scripts]
+test = "test:main"
 
 [build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
