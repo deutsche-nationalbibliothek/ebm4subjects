@@ -7,6 +7,7 @@ import xgboost as xgb
 from ebm4subjects import prepare_data
 from ebm4subjects.chunker import Chunker
 from ebm4subjects.duckdb_client import Duckdb_client
+from ebm4subjects.ebm_logging import EbmLogger, XGBLogging
 from ebm4subjects.embedding_generator import EmbeddingGenerator
 
 
@@ -14,6 +15,7 @@ class EbmModel:
     def __init__(
         self,
         db_path: Path,
+        log_path: Path,
         use_altLabels: bool,
         embedding_model_name: str,
         embedding_dimensions: int,
@@ -29,13 +31,14 @@ class EbmModel:
         xgb_interaction_depth: int,
         xgb_subsample: float,
         xgb_rounds: int,
-        xgb_verbosity: int,
         xgb_jobs: int,
     ) -> None:
         self.client = Duckdb_client(
             db_path=db_path,
             config={"hnsw_enable_experimental_persistence": True},
         )
+
+        self.logger = EbmLogger(log_path, "info").get_logger()
 
         self.chunker = Chunker(
             tokenizer=chunk_tokenizer,
@@ -58,7 +61,6 @@ class EbmModel:
         self.train_interaction_depth = xgb_interaction_depth
         self.train_subsample = xgb_subsample
         self.train_rounds = xgb_rounds
-        self.train_verbosity = xgb_verbosity
         self.train_jobs = xgb_jobs
 
         self.model = None
@@ -252,35 +254,46 @@ class EbmModel:
         )
 
     def train(self, train_data: pl.DataFrame) -> None:
-        xgb_matrix = train_data.select(
-            [
-                "score",
-                "occurrences",
-                "min_cosine_similarity",
-                "max_cosine_similarity",
-                "first_occurence",
-                "last_occurence",
-                "spread",
-                "is_prefLabel",
-            ]
+        self.logger.info("Creating training matrix")
+        matrix = xgb.DMatrix(
+            train_data.select(
+                [
+                    "score",
+                    "occurrences",
+                    "min_cosine_similarity",
+                    "max_cosine_similarity",
+                    "first_occurence",
+                    "last_occurence",
+                    "spread",
+                    "is_prefLabel",
+                ]
+            ).to_pandas(),
+            train_data.to_pandas()["gold"],
         )
 
-        matrix = xgb.DMatrix(xgb_matrix.to_pandas(), train_data.to_pandas()["gold"])
-
-        model = xgb.train(
-            params={
-                "objective": "binary:logistic",
-                "eval_metric": "logloss",
-                "eta": self.train_shrinkage,
-                "max_depth": self.train_interaction_depth,
-                "subsample": self.train_subsample,
-                "verbosity": self.train_verbosity,
-                "nthread": self.train_jobs,
-            },
-            dtrain=matrix,
-            num_boost_round=self.train_rounds,
-            evals=[(matrix, "train")],
-        )
+        try:
+            self.logger.info("Starting training of XGBoost Ranker")
+            model = xgb.train(
+                params={
+                    "objective": "binary:logistic",
+                    "eval_metric": "logloss",
+                    "eta": self.train_shrinkage,
+                    "max_depth": self.train_interaction_depth,
+                    "subsample": self.train_subsample,
+                    "nthread": self.train_jobs,
+                },
+                dtrain=matrix,
+                verbose_eval=False,
+                evals=[(matrix, "train")],
+                num_boost_round=self.train_rounds,
+                callbacks=[XGBLogging(self.logger, epoch_log_interval=1)],
+            )
+            self.logger.info("Training successful finished")
+        except xgb.core.XGBoostError:
+            self.logger.critical(
+                """XGBoost can't train with candidates equal to gold standard or candidates with no match to gold standard at all. Please check if your training data and gold standard are correct."""
+            )
+            return
 
         self.model = model
 
