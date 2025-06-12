@@ -72,19 +72,34 @@ class EbmModel:
         collection_name: str = "my_collection",
         force: bool = False,
     ) -> None:
+        self.logger.info("Parsing vocabulary")
+        vocab = prepare_data.parse_vocab(
+            vocab_path=vocab_in_path,
+            use_altLabels=self.use_altLabels,
+        )
+
+        self.logger.info("Adding embeddings to vocabulary")
         collection_df = prepare_data.add_vocab_embeddings(
-            vocab=prepare_data.parse_vocab(
-                vocab_path=vocab_in_path,
-                use_altLabels=self.use_altLabels,
-            ),
+            vocab=vocab,
             model_name=self.embedding_model_name,
             embedding_dimensions=self.embedding_dimensions,
             batch_size=self.embedding_batch_size,
         )
 
         if vocab_out_path:
-            collection_df.write_ipc(vocab_out_path)
+            try:
+                self.logger.info(f"Try saving vocabulary to {vocab_out_path}")
+                collection_df.write_ipc(vocab_out_path)
+            except FileNotFoundError:
+                self.logger.error(
+                    f"Cant't save vocabulary. Path {vocab_out_path} does not exist."
+                )
+            except PermissionError:
+                self.logger.error(
+                    f"Cant't save voacbulary. No permission to write file {vocab_out_path}."
+                )
 
+        self.logger.info("Creating collection")
         self.client.create_collection(
             collection_df=collection_df,
             collection_name=collection_name,
@@ -169,10 +184,13 @@ class EbmModel:
                 path_to_index_file,
             )
         except FileNotFoundError:
+            self.logger.error("Cant't load data. Files do not exist.")
             return
         except PermissionError:
+            self.logger.error("Cant't load data. No permission to read files.")
             return
 
+        self.logger.info("Extracting training data and gold standard from documents")
         train_texts = documents.get_column("text").to_list()
         train_doc_ids = documents.get_column("idn").to_list()
         gold_label_ids = [
@@ -181,12 +199,14 @@ class EbmModel:
         ]
         gold_doc_ids = documents.get_column("idn").to_list()
 
+        self.logger.info("Preparing training data.")
         train_candidates = self._prepare_train_data(
             texts=train_texts,
             doc_ids=train_doc_ids,
             collection_name=collection_name,
         )
 
+        self.logger.info("Preparing gold standard.")
         gold_standard = pl.DataFrame(
             {
                 "doc_id": gold_doc_ids,
@@ -194,7 +214,8 @@ class EbmModel:
             }
         )
 
-        return (
+        self.logger.info("Prepare training data and gold standard for training")
+        training_data = (
             self._compare_to_gold_standard(train_candidates, gold_standard)
             .with_columns(pl.when(pl.col("gold")).then(1).otherwise(0).alias("gold"))
             .filter(pl.col("doc_id").is_not_null())
@@ -212,6 +233,8 @@ class EbmModel:
                 ]
             )
         )
+
+        return training_data
 
     def prepare_train(
         self,
@@ -221,12 +244,14 @@ class EbmModel:
         gold_doc_ids: list[str],
         gold_label_ids: list[str],
     ) -> pl.DataFrame:
+        self.logger.info("Preparing training data.")
         train_candidates = self._prepare_train_data(
             texts=train_texts,
             doc_ids=train_doc_ids,
             collection_name=collection_name,
         )
 
+        self.logger.info("Preparing gold standard.")
         gold_standard = pl.DataFrame(
             {
                 "doc_id": gold_doc_ids,
@@ -234,7 +259,8 @@ class EbmModel:
             }
         )
 
-        return (
+        self.logger.info("Prepare training data and gold standard for training.")
+        training_data = (
             self._compare_to_gold_standard(train_candidates, gold_standard)
             .with_columns(pl.when(pl.col("gold")).then(1).otherwise(0).alias("gold"))
             .filter(pl.col("doc_id").is_not_null())
@@ -252,6 +278,8 @@ class EbmModel:
                 ]
             )
         )
+
+        return training_data
 
     def train(self, train_data: pl.DataFrame) -> None:
         self.logger.info("Creating training matrix")
@@ -430,22 +458,22 @@ class EbmModel:
             try:
                 self.model = pickle.load(open(input_path, "rb"))
             except FileNotFoundError:
-                self.logger.warn(
+                self.logger.error(
                     f"Cant't load model. File {input_path} does not exist."
                 )
                 return
             except PermissionError:
-                self.logger.warn(
+                self.logger.error(
                     f"Cant't load model. No permission to read file {input_path}."
                 )
                 return
         else:
-            self.logger.warn("Cant't load model. Model already loaded.")
+            self.logger.error("Cant't load model. Model already loaded.")
             return
 
     def save(self, output_path: Path, force: bool = False) -> None:
         if output_path.exists() and not force:
-            self.logger.warn(
+            self.logger.error(
                 f"Cant't save model to {output_path}. Model already exist. Try force=True to overwrite model file."
             )
             return
@@ -453,12 +481,12 @@ class EbmModel:
             try:
                 pickle.dump(self.model, open(output_path, "wb"))
             except FileNotFoundError:
-                self.logger.warn(
-                    f"Cant't load model. Path {output_path} does not exist."
+                self.logger.error(
+                    f"Cant't save model. Path {output_path} does not exist."
                 )
                 return
             except PermissionError:
-                self.logger.warn(
-                    f"Cant't load model. No permission to write file {output_path}."
+                self.logger.error(
+                    f"Cant't save model. No permission to write file {output_path}."
                 )
                 return
