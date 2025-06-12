@@ -308,23 +308,29 @@ class EbmModel:
             embedding_dimensions=self.embedding_dimensions,
         )
 
+        self.logger.info("Chunking text")
         text_chunks = self.chunker.chunk_text(text)
 
+        self.logger.info("Creating embeddings for text chunks")
+        embeddings = embedding_generator.generate_embeddings(
+            texts=text_chunks,
+            batch_size=self.embedding_batch_size,
+            task="retrieval.passage",
+        )
+
+        self.logger.info("Creating query dataframe")
         query_df = pl.DataFrame(
             {
                 "query_id": [i + 1 for i in range(len(text_chunks))],
                 "query_doc_id": [doc_id for _ in range(len(text_chunks))],
                 "chunk_position": [i + 1 for i in range(len(text_chunks))],
                 "n_chunks": [len(text_chunks) for _ in range(len(text_chunks))],
-                "embeddings": embedding_generator.generate_embeddings(
-                    texts=text_chunks,
-                    batch_size=self.embedding_batch_size,
-                    task="retrieval.passage",
-                ),
+                "embeddings": embeddings,
             }
         )
 
-        return self.client.vector_search(
+        self.logger.info("Running verctor search and creating candidates")
+        candidates = self.client.vector_search(
             query_df=query_df,
             collection_name=collection_name,
             embedding_dimensions=self.embedding_dimensions,
@@ -334,6 +340,8 @@ class EbmModel:
             top_k=self.query_top_k,
             hnsw_metric_function="array_cosine_distance",
         )
+
+        return candidates
 
     def generate_candidates_batch(
         self,
@@ -346,10 +354,12 @@ class EbmModel:
             embedding_dimensions=self.embedding_dimensions,
         )
 
+        self.logger.info("Chunking texts")
         text_chunks = []
         for text in texts:
             text_chunks.append(self.chunker.chunk_text(text))
 
+        self.logger.info("Creating embeddings for text chunks and query dataframe")
         query_dfs = []
         id_count = 1
         for doc_id, chunks in zip(doc_ids, text_chunks):
@@ -368,11 +378,13 @@ class EbmModel:
                     }
                 )
             )
-
             id_count += len(chunks)
 
-        return self.client.vector_search(
-            query_df=pl.concat(query_dfs),
+        query_df = (pl.concat(query_dfs),)
+
+        self.logger.info("Running verctor search and creating candidates")
+        candidates = self.client.vector_search(
+            query_df=query_df,
             collection_name=collection_name,
             embedding_dimensions=self.embedding_dimensions,
             n_jobs=self.query_jobs,
@@ -382,7 +394,10 @@ class EbmModel:
             hnsw_metric_function="array_cosine_distance",
         )
 
+        return candidates
+
     def predict(self, candidates: pl.DataFrame) -> pl.DataFrame:
+        self.logger.info("Creating matrix of candidates to generate predictions")
         matrix = xgb.DMatrix(
             candidates.select(
                 [
@@ -398,10 +413,11 @@ class EbmModel:
             )
         )
 
+        self.logger.info("Making predictions for candidates")
+        predictions = self.model.predict(matrix)
+
         return (
-            candidates.with_columns(
-                pl.Series(self.model.predict(matrix)).alias("score")
-            )
+            candidates.with_columns(pl.Series(predictions).alias("score"))
             .select(["doc_id", "label_id", "score"])
             .sort(["doc_id", "score"], descending=[False, True])
             .group_by("doc_id")
