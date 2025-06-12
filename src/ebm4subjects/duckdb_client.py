@@ -24,7 +24,7 @@ class Duckdb_client:
         collection_name: str = "my_collection",
         embedding_dimensions: int = 1024,
         hnsw_index_name: str = "hnsw_index",
-        hnsw_metric: str = "l2sq",
+        hnsw_metric: str = "cosine",
         force: bool = False,
     ):
         replace = ""
@@ -34,7 +34,7 @@ class Duckdb_client:
         self.connection.execute(
             f"""CREATE {replace}TABLE {collection_name} (
                 id INTEGER,
-                idn VARCHAR,
+                doc_id VARCHAR,
                 label_text VARCHAR,
                 is_prefLabel BOOLEAN,
                 embeddings FLOAT[{embedding_dimensions}])"""
@@ -62,7 +62,7 @@ class Duckdb_client:
         n_hits: int = 10,
         chunk_size: int = 2048,
         top_k: int = 10,
-        hnsw_metric_function: str = "array_distance",
+        hnsw_metric_function: str = "array_cosine_distance",
     ) -> pl.DataFrame:
         query_dfs = [
             query_df.slice(i, chunk_size) for i in range(0, query_df.height, chunk_size)
@@ -136,7 +136,7 @@ class Duckdb_client:
             result_df.sort("score", descending=True).group_by("doc_id").head(top_k)
         )
 
-        result_df = (
+        return (
             result_df.with_columns(
                 (pl.col("score") / pl.col("n_chunks")),
                 (pl.col("occurrences") / pl.col("n_chunks")),
@@ -148,22 +148,20 @@ class Duckdb_client:
             .sort(["doc_id", "label_id"])
         )
 
-        return result_df
-
     def _vss_thread_query(
         self,
         queries_df: pl.DataFrame,
         collection_name: str,
         vector_dimensions: int,
-        hnsw_metric_function: str = "array_distance",
+        hnsw_metric_function: str = "array_cosine_distance",
         limit: int = 10,
     ):
         thread_connection = self.connection.cursor()
 
         thread_connection.execute(
             f"""CREATE OR REPLACE TEMP TABLE queries ( 
-                id INTEGER,
-                doc_id VARCHAR,
+                query_id INTEGER,
+                query_doc_id VARCHAR,
                 chunk_position INTEGER,
                 n_chunks INTEGER,
                 embeddings FLOAT[{vector_dimensions}])"""
@@ -175,15 +173,15 @@ class Duckdb_client:
 
         thread_connection.execute(
             f"""INSERT INTO results
-            SELECT queries.id, 
-            queries.doc_id,
+            SELECT queries.query_id, 
+            queries.query_doc_id,
             queries.chunk_position,
             queries.n_chunks,
-            idn AS label_id,
+            doc_id AS label_id,
             is_prefLabel,
             (1 - score) AS score,
             FROM queries, LATERAL (
-                SELECT {collection_name}.idn,
+                SELECT {collection_name}.doc_id,
                 {collection_name}.is_prefLabel,
                 {hnsw_metric_function}(queries.embeddings, {collection_name}.embeddings) AS score
                 FROM {collection_name}

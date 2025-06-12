@@ -139,24 +139,21 @@ class EbmModel:
                 path_to_document_file,
                 has_header=False,
                 separator="\t",
+                schema={"text": pl.String, "label_id": pl.String},
             )
             .with_row_index()
-            .with_columns(pl.col("column_2").str.split(" "))
-            .explode("column_2")
+            .with_columns(pl.col("label_id").str.split(" "))
+            .explode("label_id")
         )
 
         index = pl.read_ipc(path_to_index_file)
 
-        return (
-            documents.join(
-                other=index,
-                left_on="index",
-                right_on="location",
-                how="inner",
-            )
-            .select(["column_1", "column_2", "idn"])
-            .rename({"column_1": "text", "column_2": "label_id"})
-        )
+        return documents.join(
+            other=index,
+            left_on="index",
+            right_on="location",
+            how="inner",
+        ).select(["text", "label_id", "idn"])
 
     def prepare_train_from_docs(
         self,
@@ -302,8 +299,8 @@ class EbmModel:
 
         query_df = pl.DataFrame(
             {
-                "id": [i + 1 for i in range(len(text_chunks))],
-                "doc_id": [doc_id for _ in range(len(text_chunks))],
+                "query_id": [i + 1 for i in range(len(text_chunks))],
+                "query_doc_id": [doc_id for _ in range(len(text_chunks))],
                 "chunk_position": [i + 1 for i in range(len(text_chunks))],
                 "n_chunks": [len(text_chunks) for _ in range(len(text_chunks))],
                 "embeddings": embedding_generator.generate_embeddings(
@@ -346,8 +343,8 @@ class EbmModel:
             query_dfs.append(
                 pl.DataFrame(
                     {
-                        "id": [i + id_count for i in range(len(chunks))],
-                        "doc_id": [doc_id for _ in range(len(chunks))],
+                        "query_id": [i + id_count for i in range(len(chunks))],
+                        "query_doc_id": [doc_id for _ in range(len(chunks))],
                         "chunk_position": [i + 1 for i in range(len(chunks))],
                         "n_chunks": [len(chunks) for _ in range(len(chunks))],
                         "embeddings": embedding_generator.generate_embeddings(
