@@ -18,18 +18,19 @@ class EbmModel:
         embedding_model_name: str,
         embedding_dimensions: int,
         embedding_batch_size: int,
+        chunk_tokenizer: str,
         max_chunks: int,
         max_chunk_size: int,
         max_sentences: int,
         max_query_hits: int,
         query_top_k: int,
         query_jobs: int,
-        train_shrinkage: float,
-        train_interaction_depth: int,
-        train_subsample: float,
-        train_rounds: int,
-        train_verbosity: int,
-        train_jobs: int,
+        xgb_shrinkage: float,
+        xgb_interaction_depth: int,
+        xgb_subsample: float,
+        xgb_rounds: int,
+        xgb_verbosity: int,
+        xgb_jobs: int,
     ) -> None:
         self.client = Duckdb_client(
             db_path=db_path,
@@ -37,6 +38,7 @@ class EbmModel:
         )
 
         self.chunker = Chunker(
+            tokenizer=chunk_tokenizer,
             max_chunks=max_chunks,
             max_chunk_size=max_chunk_size,
             max_sentences=max_sentences,
@@ -52,12 +54,12 @@ class EbmModel:
         self.query_top_k = query_top_k
         self.query_jobs = query_jobs
 
-        self.train_shrinkage = train_shrinkage
-        self.train_interaction_depth = train_interaction_depth
-        self.train_subsample = train_subsample
-        self.train_rounds = train_rounds
-        self.train_verbosity = train_verbosity
-        self.train_jobs = train_jobs
+        self.train_shrinkage = xgb_shrinkage
+        self.train_interaction_depth = xgb_interaction_depth
+        self.train_subsample = xgb_subsample
+        self.train_rounds = xgb_rounds
+        self.train_verbosity = xgb_verbosity
+        self.train_jobs = xgb_jobs
 
         self.model = None
 

@@ -5,8 +5,8 @@ import pyoxigraph
 
 from ebm4subjects.embedding_generator import EmbeddingGenerator
 
-PREF_LABEL_IRI = "http://www.w3.org/2004/02/skos/core#prefLabel"
-ALT_LABEL_IRI = "http://www.w3.org/2004/02/skos/core#altLabel"
+PREF_LABEL_URI = "http://www.w3.org/2004/02/skos/core#prefLabel"
+ALT_LABEL_URI = "http://www.w3.org/2004/02/skos/core#altLabel"
 
 
 def parse_vocab(vocab_path: Path, use_altLabels: bool = True) -> pl.DataFrame:
@@ -20,11 +20,11 @@ def parse_vocab(vocab_path: Path, use_altLabels: bool = True) -> pl.DataFrame:
             idn = identifier.value.split("/")[-1]
             label_text = label.value
 
-            if pref_alt.value == PREF_LABEL_IRI:
+            if pref_alt.value == PREF_LABEL_URI:
                 idns.append(idn)
                 label_texts.append(label_text)
                 pref_labels.append(True)
-            elif pref_alt.value == ALT_LABEL_IRI and use_altLabels:
+            elif pref_alt.value == ALT_LABEL_URI and use_altLabels:
                 idns.append(idn)
                 label_texts.append(label_text)
                 pref_labels.append(True)

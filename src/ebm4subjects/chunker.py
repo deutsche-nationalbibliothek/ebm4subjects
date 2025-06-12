@@ -4,6 +4,7 @@ import nltk
 class Chunker:
     def __init__(
         self,
+        tokenizer: str,
         max_chunks: int | None,
         max_chunk_size: int | None,
         max_sentences: int | None,
@@ -12,7 +13,7 @@ class Chunker:
         self.max_chunk_size = max_chunk_size if max_chunk_size else float("inf")
         self.max_sentences = max_sentences if max_sentences else float("inf")
 
-        self.tokenizer = nltk.data.load("tokenizers/punkt/german.pickle")
+        self.tokenizer = nltk.data.load(tokenizer)
 
     def chunk_text(self, text: str) -> list[str]:
         chunks = []
