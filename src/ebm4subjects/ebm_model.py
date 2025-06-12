@@ -414,17 +414,35 @@ class EbmModel:
             try:
                 self.model = pickle.load(open(input_path, "rb"))
             except FileNotFoundError:
+                self.logger.warn(
+                    f"Cant't load model. File {input_path} does not exist."
+                )
                 return
             except PermissionError:
+                self.logger.warn(
+                    f"Cant't load model. No permission to read file {input_path}."
+                )
                 return
+        else:
+            self.logger.warn("Cant't load model. Model already loaded.")
+            return
 
     def save(self, output_path: Path, force: bool = False) -> None:
         if output_path.exists() and not force:
+            self.logger.warn(
+                f"Cant't save model to {output_path}. Model already exist. Try force=True to overwrite model file."
+            )
             return
         else:
             try:
                 pickle.dump(self.model, open(output_path, "wb"))
             except FileNotFoundError:
+                self.logger.warn(
+                    f"Cant't load model. Path {output_path} does not exist."
+                )
                 return
             except PermissionError:
+                self.logger.warn(
+                    f"Cant't load model. No permission to write file {output_path}."
+                )
                 return
