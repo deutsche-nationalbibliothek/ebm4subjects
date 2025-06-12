@@ -8,10 +8,16 @@ class EbmLogger:
     def __init__(self, log_path: Path, level: str = "info") -> None:
         self.logger = logging.getLogger(__name__)
 
-        if level == "info":
+        if level == "error":
+            self.logger.setLevel(logging.ERROR)
+        elif level == "warning":
+            self.logger.setLevel(logging.WARNING)
+        elif level == "info":
             self.logger.setLevel(logging.INFO)
         elif level == "debug":
             self.logger.setLevel(logging.DEBUG)
+        else:
+            self.logger.setLevel(logging.NOTSET)
 
         log_file_handler = logging.FileHandler(f"{log_path}/ebm.log")
         log_file_handler.setFormatter(
