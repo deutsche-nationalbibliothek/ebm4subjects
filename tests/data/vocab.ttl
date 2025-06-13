@@ -1,0 +1,33 @@
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix ex: <http://example.org/concept/> .
+
+ex:animal a skos:Concept ;
+    skos:prefLabel "Animal"@en ;
+    skos:narrower ex:mammal .
+
+ex:mammal a skos:Concept ;
+    skos:prefLabel "Mammal"@en ;
+    skos:broader ex:animal ;
+    skos:narrower ex:dog .
+
+ex:dog a skos:Concept ;
+    skos:prefLabel "Dog"@en ;
+    skos:broader ex:mammal .
+
+ex:mathematics a skos:Concept ;
+    skos:prefLabel "Mathematics"@en ;
+    skos:narrower ex:analysis, ex:algebra .
+
+ex:analysis a skos:Concept ;
+    skos:prefLabel "Analysis"@en ;
+    skos:altLabel "Calculus"@en ;
+    skos:broader ex:mathematics ;
+    skos:narrower ex:differential_geometry .
+
+ex:algebra a skos:Concept ;
+    skos:prefLabel "Algebra"@en ;
+    skos:broader ex:mathematics .
+    
+ex:differential_geometry a skos:Concept ;
+    skos:prefLabel "Differential Geometry"@en ;
+    skos:broader ex:analysis .
