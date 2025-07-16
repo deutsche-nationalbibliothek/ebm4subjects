@@ -34,7 +34,7 @@ class Duckdb_client:
         self.connection.execute(
             f"""CREATE {replace}TABLE {collection_name} (
                 id INTEGER,
-                doc_id VARCHAR,
+                label_id VARCHAR,
                 label_text VARCHAR,
                 is_prefLabel BOOLEAN,
                 embeddings FLOAT[{embedding_dimensions}])"""
@@ -177,11 +177,11 @@ class Duckdb_client:
             queries.query_doc_id,
             queries.chunk_position,
             queries.n_chunks,
-            doc_id AS label_id,
+            label_id,
             is_prefLabel,
             (1 - score) AS score,
             FROM queries, LATERAL (
-                SELECT {collection_name}.doc_id,
+                SELECT {collection_name}.label_id,
                 {collection_name}.is_prefLabel,
                 {hnsw_metric_function}(queries.embeddings, {collection_name}.embeddings) AS score
                 FROM {collection_name}
