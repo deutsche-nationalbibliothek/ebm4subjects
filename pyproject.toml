@@ -3,7 +3,8 @@ name = "ebm4subjects"
 version = "0.1.0"
 description = ""
 authors = [
-    {name = "Clemens Rietdorf",email = "c.rietdorf@dnb.de"}
+    {name = "Clemens Rietdorf", email = "c.rietdorf@dnb.de"},
+    {name = "Maximilian Kähler", email = "m.kaehler@dnb.de"}
 ]
 
 readme = "README.md"
@@ -24,6 +25,7 @@ dependencies = [
     "pyoxigraph>=0.4.11",
     "pytest>=8.4.0",
     "setuptools>=80.9.0",
+"sentence-transformers>=5.0.0",
     "torch>=2.7.1",
     "transformers>=4.52.4",
     "xgboost>=3.0.2",
