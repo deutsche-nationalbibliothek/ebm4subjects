@@ -79,7 +79,7 @@ class EbmModel:
     def create_vector_db(
         self,
         vocab_in_path: str,
-        vocab_out_path: str | None,
+        vocab_out_path: str | None = None,
         force: bool = False,
     ) -> None:
         if self.logger:
@@ -413,12 +413,14 @@ class EbmModel:
             embedding_dimensions=self.embedding_dimensions,
         )
 
-        self.logger.info("Chunking texts")
+        if self.logger:
+            self.logger.info("Chunking texts")
         text_chunks = []
         for text in texts:
             text_chunks.append(self.chunker.chunk_text(text))
 
-        self.logger.info("Creating embeddings for text chunks and query dataframe")
+        if self.logger:
+            self.logger.info("Creating embeddings for text chunks and query dataframe")
         query_dfs = []
         id_count = 1
         for doc_id, chunks in zip(doc_ids, text_chunks):
@@ -441,7 +443,8 @@ class EbmModel:
 
         query_df = pl.concat(query_dfs)
 
-        self.logger.info("Running verctor search and creating candidates")
+        if self.logger:
+            self.logger.info("Running verctor search and creating candidates")
         candidates = self.client.vector_search(
             query_df=query_df,
             collection_name=self.collection_name,
@@ -506,26 +509,3 @@ class EbmModel:
             config={"hnsw_enable_experimental_persistence": True, "threads": 42},
         )
         return model
-
-    def load2(self, input_path: str) -> None:
-        import pickle
-
-        if not self.model:
-            try:
-                self.model = pickle.load(open(input_path, "rb"))
-            except FileNotFoundError:
-                if self.logger:
-                    self.logger.error(
-                        f"Cant't load model. File {input_path} does not exist."
-                    )
-                return
-            except PermissionError:
-                if self.logger:
-                    self.logger.error(
-                        f"Cant't load model. No permission to read file {input_path}."
-                    )
-                return
-        else:
-            if self.logger:
-                self.logger.error("Cant't load model. Model already loaded.")
-            return

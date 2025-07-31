@@ -1,6 +1,6 @@
 [project]
 name = "ebm4subjects"
-version = "0.2.1"
+version = "0.2.4"
 description = ""
 authors = [
     {name = "Clemens Rietdorf",email = "c.rietdorf@dnb.de"}
