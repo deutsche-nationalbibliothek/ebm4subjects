@@ -15,6 +15,7 @@ class EbmModel:
     def __init__(
         self,
         db_path: Path,
+        collection_name: str,
         log_path: Path,
         use_altLabels: bool,
         embedding_model_name: str,
@@ -35,8 +36,9 @@ class EbmModel:
     ) -> None:
         self.client = Duckdb_client(
             db_path=db_path,
-            config={"hnsw_enable_experimental_persistence": True},
+            config={"hnsw_enable_experimental_persistence": True, "threads": 42},
         )
+        self.collection_name = collection_name
 
         self.logger = EbmLogger(log_path, "info").get_logger()
 
@@ -69,7 +71,6 @@ class EbmModel:
         self,
         vocab_in_path: Path,
         vocab_out_path: Path | None,
-        collection_name: str = "my_collection",
         force: bool = False,
     ) -> None:
         self.logger.info("Parsing vocabulary")
@@ -102,7 +103,7 @@ class EbmModel:
         self.logger.info("Creating collection")
         self.client.create_collection(
             collection_df=collection_df,
-            collection_name=collection_name,
+            collection_name=self.collection_name,
             embedding_dimensions=self.embedding_dimensions,
             hnsw_index_name="hnsw_index",
             hnsw_metric="cosine",
@@ -113,7 +114,6 @@ class EbmModel:
         self,
         texts: list[str],
         doc_ids: list[int],
-        collection_name: str,
     ) -> pl.DataFrame:
         candidates_dfs = []
 
@@ -122,7 +122,6 @@ class EbmModel:
                 self.generate_candidates(
                     text=text,
                     doc_id=doc_id,
-                    collection_name=collection_name,
                 )
             )
 
@@ -176,7 +175,6 @@ class EbmModel:
         self,
         path_to_document_file: Path,
         path_to_index_file: Path,
-        collection_name: str = "my_collection",
     ) -> pl.DataFrame:
         try:
             documents = self._read_long_document_format(
@@ -203,7 +201,6 @@ class EbmModel:
         train_candidates = self._prepare_train_data(
             texts=train_texts,
             doc_ids=train_doc_ids,
-            collection_name=collection_name,
         )
 
         self.logger.info("Preparing gold standard.")
@@ -211,7 +208,9 @@ class EbmModel:
             {
                 "doc_id": gold_doc_ids,
                 "label_id": gold_label_ids,
-            }
+            },
+        ).with_columns(
+            pl.col("doc_id").cast(pl.String), pl.col("label_id").cast(pl.String)
         )
 
         self.logger.info("Prepare training data and gold standard for training")
@@ -240,7 +239,6 @@ class EbmModel:
         self,
         train_texts: list[str],
         train_doc_ids: list[str],
-        collection_name: str,
         gold_doc_ids: list[str],
         gold_label_ids: list[str],
     ) -> pl.DataFrame:
@@ -248,7 +246,6 @@ class EbmModel:
         train_candidates = self._prepare_train_data(
             texts=train_texts,
             doc_ids=train_doc_ids,
-            collection_name=collection_name,
         )
 
         self.logger.info("Preparing gold standard.")
@@ -257,6 +254,8 @@ class EbmModel:
                 "doc_id": gold_doc_ids,
                 "label_id": gold_label_ids,
             }
+        ).with_columns(
+            pl.col("doc_id").cast(pl.String), pl.col("label_id").cast(pl.String)
         )
 
         self.logger.info("Prepare training data and gold standard for training.")
@@ -329,7 +328,6 @@ class EbmModel:
         self,
         text: str,
         doc_id: int,
-        collection_name: str,
     ) -> pl.DataFrame:
         embedding_generator = EmbeddingGenerator(
             model_name=self.embedding_model_name,
@@ -360,7 +358,7 @@ class EbmModel:
         self.logger.info("Running verctor search and creating candidates")
         candidates = self.client.vector_search(
             query_df=query_df,
-            collection_name=collection_name,
+            collection_name=self.collection_name,
             embedding_dimensions=self.embedding_dimensions,
             n_jobs=self.query_jobs,
             n_hits=self.max_query_hits,
@@ -375,7 +373,6 @@ class EbmModel:
         self,
         texts: list[str],
         doc_ids: list[int],
-        collection_name: str,
     ):
         embedding_generator = EmbeddingGenerator(
             model_name=self.embedding_model_name,
@@ -413,7 +410,7 @@ class EbmModel:
         self.logger.info("Running verctor search and creating candidates")
         candidates = self.client.vector_search(
             query_df=query_df,
-            collection_name=collection_name,
+            collection_name=self.collection_name,
             embedding_dimensions=self.embedding_dimensions,
             n_jobs=self.query_jobs,
             n_hits=self.max_query_hits,
