@@ -18,7 +18,7 @@ class EbmModel:
         self,
         db_path: str,
         collection_name: str,
-        log_path: str,
+        log_path: str | None,
         use_altLabels: bool,
         embedding_model_name: str,
         embedding_dimensions: int,
@@ -43,7 +43,13 @@ class EbmModel:
         self.db_path = db_path
         self.collection_name = collection_name
 
-        self.logger = EbmLogger(log_path, "info").get_logger()
+        self.logger = None
+        self.xgb_logger = None
+        self.xgb_callbacks = None
+        if log_path:
+            self.logger = EbmLogger(log_path, "info").get_logger()
+            self.xgb_logger = XGBLogging(self.logger, epoch_log_interval=1)
+            self.xgb_callbacks = [self.xgb_logger]
 
         self.chunker = Chunker(
             tokenizer=chunk_tokenizer,
@@ -76,13 +82,15 @@ class EbmModel:
         vocab_out_path: str | None,
         force: bool = False,
     ) -> None:
-        self.logger.info("Parsing vocabulary")
+        if self.logger:
+            self.logger.info("Parsing vocabulary")
         vocab = prepare_data.parse_vocab(
             vocab_path=vocab_in_path,
             use_altLabels=self.use_altLabels,
         )
 
-        self.logger.info("Adding embeddings to vocabulary")
+        if self.logger:
+            self.logger.info("Adding embeddings to vocabulary")
         collection_df = prepare_data.add_vocab_embeddings(
             vocab=vocab,
             model_name=self.embedding_model_name,
@@ -92,18 +100,22 @@ class EbmModel:
 
         if vocab_out_path:
             try:
-                self.logger.info(f"Try saving vocabulary to {vocab_out_path}")
+                if self.logger:
+                    self.logger.info(f"Try saving vocabulary to {vocab_out_path}")
                 collection_df.write_ipc(vocab_out_path)
             except FileNotFoundError:
-                self.logger.error(
-                    f"Cant't save vocabulary. Path {vocab_out_path} does not exist."
-                )
+                if self.logger:
+                    self.logger.error(
+                        f"Cant't save vocabulary. Path {vocab_out_path} does not exist."
+                    )
             except PermissionError:
-                self.logger.error(
-                    f"Cant't save voacbulary. No permission to write file {vocab_out_path}."
-                )
+                if self.logger:
+                    self.logger.error(
+                        f"Cant't save voacbulary. No permission to write file {vocab_out_path}."
+                    )
 
-        self.logger.info("Creating collection")
+        if self.logger:
+            self.logger.info("Creating collection")
         self.client.create_collection(
             collection_df=collection_df,
             collection_name=self.collection_name,
@@ -185,13 +197,18 @@ class EbmModel:
                 path_to_index_file,
             )
         except FileNotFoundError:
-            self.logger.error("Cant't load data. Files do not exist.")
+            if self.logger:
+                self.logger.error("Cant't load data. Files do not exist.")
             return
         except PermissionError:
-            self.logger.error("Cant't load data. No permission to read files.")
+            if self.logger:
+                self.logger.error("Cant't load data. No permission to read files.")
             return
 
-        self.logger.info("Extracting training data and gold standard from documents")
+        if self.logger:
+            self.logger.info(
+                "Extracting training data and gold standard from documents"
+            )
         train_texts = documents.get_column("text").to_list()
         train_doc_ids = documents.get_column("idn").to_list()
         gold_label_ids = [
@@ -200,13 +217,15 @@ class EbmModel:
         ]
         gold_doc_ids = documents.get_column("idn").to_list()
 
-        self.logger.info("Preparing training data.")
+        if self.logger:
+            self.logger.info("Preparing training data.")
         train_candidates = self._prepare_train_data(
             texts=train_texts,
             doc_ids=train_doc_ids,
         )
 
-        self.logger.info("Preparing gold standard.")
+        if self.logger:
+            self.logger.info("Preparing gold standard.")
         gold_standard = pl.DataFrame(
             {
                 "doc_id": gold_doc_ids,
@@ -216,7 +235,8 @@ class EbmModel:
             pl.col("doc_id").cast(pl.String), pl.col("label_id").cast(pl.String)
         )
 
-        self.logger.info("Prepare training data and gold standard for training")
+        if self.logger:
+            self.logger.info("Prepare training data and gold standard for training")
         training_data = (
             self._compare_to_gold_standard(train_candidates, gold_standard)
             .with_columns(pl.when(pl.col("gold")).then(1).otherwise(0).alias("gold"))
@@ -245,13 +265,15 @@ class EbmModel:
         gold_doc_ids: list[str],
         gold_label_ids: list[str],
     ) -> pl.DataFrame:
-        self.logger.info("Preparing training data.")
+        if self.logger:
+            self.logger.info("Preparing training data.")
         train_candidates = self._prepare_train_data(
             texts=train_texts,
             doc_ids=train_doc_ids,
         )
 
-        self.logger.info("Preparing gold standard.")
+        if self.logger:
+            self.logger.info("Preparing gold standard.")
         gold_standard = pl.DataFrame(
             {
                 "doc_id": gold_doc_ids,
@@ -261,7 +283,8 @@ class EbmModel:
             pl.col("doc_id").cast(pl.String), pl.col("label_id").cast(pl.String)
         )
 
-        self.logger.info("Prepare training data and gold standard for training.")
+        if self.logger:
+            self.logger.info("Prepare training data and gold standard for training.")
         training_data = (
             self._compare_to_gold_standard(train_candidates, gold_standard)
             .with_columns(pl.when(pl.col("gold")).then(1).otherwise(0).alias("gold"))
@@ -284,7 +307,8 @@ class EbmModel:
         return training_data
 
     def train(self, train_data: pl.DataFrame) -> None:
-        self.logger.info("Creating training matrix")
+        if self.logger:
+            self.logger.info("Creating training matrix")
         matrix = xgb.DMatrix(
             train_data.select(
                 [
@@ -302,7 +326,8 @@ class EbmModel:
         )
 
         try:
-            self.logger.info("Starting training of XGBoost Ranker")
+            if self.logger:
+                self.logger.info("Starting training of XGBoost Ranker")
             model = xgb.train(
                 params={
                     "objective": "binary:logistic",
@@ -316,13 +341,15 @@ class EbmModel:
                 verbose_eval=False,
                 evals=[(matrix, "train")],
                 num_boost_round=self.train_rounds,
-                callbacks=[XGBLogging(self.logger, epoch_log_interval=1)],
+                callbacks=self.xgb_callbacks,
             )
-            self.logger.info("Training successful finished")
+            if self.logger:
+                self.logger.info("Training successful finished")
         except xgb.core.XGBoostError:
-            self.logger.critical(
-                """XGBoost can't train with candidates equal to gold standard or candidates with no match to gold standard at all. Please check if your training data and gold standard are correct."""
-            )
+            if self.logger:
+                self.logger.critical(
+                    """XGBoost can't train with candidates equal to gold standard or candidates with no match to gold standard at all. Please check if your training data and gold standard are correct."""
+                )
             return
 
         self.model = model
@@ -337,17 +364,20 @@ class EbmModel:
             embedding_dimensions=self.embedding_dimensions,
         )
 
-        self.logger.info("Chunking text")
+        if self.logger:
+            self.logger.info("Chunking text")
         text_chunks = self.chunker.chunk_text(text)
 
-        self.logger.info("Creating embeddings for text chunks")
+        if self.logger:
+            self.logger.info("Creating embeddings for text chunks")
         embeddings = embedding_generator.generate_embeddings(
             texts=text_chunks,
             batch_size=self.embedding_batch_size,
             task="retrieval.passage",
         )
 
-        self.logger.info("Creating query dataframe")
+        if self.logger:
+            self.logger.info("Creating query dataframe")
         query_df = pl.DataFrame(
             {
                 "query_id": [i + 1 for i in range(len(text_chunks))],
@@ -358,7 +388,8 @@ class EbmModel:
             }
         )
 
-        self.logger.info("Running verctor search and creating candidates")
+        if self.logger:
+            self.logger.info("Running verctor search and creating candidates")
         candidates = self.client.vector_search(
             query_df=query_df,
             collection_name=self.collection_name,
@@ -425,7 +456,8 @@ class EbmModel:
         return candidates
 
     def predict(self, candidates: pl.DataFrame) -> list[pl.DataFrame]:
-        self.logger.info("Creating matrix of candidates to generate predictions")
+        if self.logger:
+            self.logger.info("Creating matrix of candidates to generate predictions")
         matrix = xgb.DMatrix(
             candidates.select(
                 [
@@ -441,7 +473,8 @@ class EbmModel:
             )
         )
 
-        self.logger.info("Making predictions for candidates")
+        if self.logger:
+            self.logger.info("Making predictions for candidates")
         predictions = self.model.predict(matrix)
 
         return (
@@ -456,9 +489,10 @@ class EbmModel:
 
     def save(self, output_path: str, force: bool = False) -> None:
         if Path(output_path).exists() and not force:
-            self.logger.error(
-                f"Cant't save model to {output_path}. Model already exist. Try force=True to overwrite model file."
-            )
+            if self.logger:
+                self.logger.error(
+                    f"Cant't save model to {output_path}. Model already exist. Try force=True to overwrite model file."
+                )
             return
         else:
             self.client = None
@@ -480,15 +514,18 @@ class EbmModel:
             try:
                 self.model = pickle.load(open(input_path, "rb"))
             except FileNotFoundError:
-                self.logger.error(
-                    f"Cant't load model. File {input_path} does not exist."
-                )
+                if self.logger:
+                    self.logger.error(
+                        f"Cant't load model. File {input_path} does not exist."
+                    )
                 return
             except PermissionError:
-                self.logger.error(
-                    f"Cant't load model. No permission to read file {input_path}."
-                )
+                if self.logger:
+                    self.logger.error(
+                        f"Cant't load model. No permission to read file {input_path}."
+                    )
                 return
         else:
-            self.logger.error("Cant't load model. Model already loaded.")
+            if self.logger:
+                self.logger.error("Cant't load model. Model already loaded.")
             return
