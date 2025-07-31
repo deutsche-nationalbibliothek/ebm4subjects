@@ -16,9 +16,9 @@ from ebm4subjects.embedding_generator import EmbeddingGenerator
 class EbmModel:
     def __init__(
         self,
-        db_path: Path,
+        db_path: str,
         collection_name: str,
-        log_path: Path,
+        log_path: str,
         use_altLabels: bool,
         embedding_model_name: str,
         embedding_dimensions: int,
@@ -72,8 +72,8 @@ class EbmModel:
 
     def create_vector_db(
         self,
-        vocab_in_path: Path,
-        vocab_out_path: Path | None,
+        vocab_in_path: str,
+        vocab_out_path: str | None,
         force: bool = False,
     ) -> None:
         self.logger.info("Parsing vocabulary")
@@ -150,8 +150,8 @@ class EbmModel:
 
     def _read_long_document_format(
         self,
-        path_to_document_file: Path,
-        path_to_index_file: Path,
+        path_to_document_file: str,
+        path_to_index_file: str,
     ) -> pl.DataFrame:
         documents = (
             pl.read_csv(
@@ -176,8 +176,8 @@ class EbmModel:
 
     def prepare_train_from_docs(
         self,
-        path_to_document_file: Path,
-        path_to_index_file: Path,
+        path_to_document_file: str,
+        path_to_index_file: str,
     ) -> pl.DataFrame:
         try:
             documents = self._read_long_document_format(
@@ -453,8 +453,8 @@ class EbmModel:
             .explode(["label_id", "score"])
         )
 
-    def save(self, output_path: Path, force: bool = False) -> None:
-        if output_path.exists() and not force:
+    def save(self, output_path: str, force: bool = False) -> None:
+        if Path(output_path).exists() and not force:
             self.logger.error(
                 f"Cant't save model to {output_path}. Model already exist. Try force=True to overwrite model file."
             )
@@ -464,7 +464,7 @@ class EbmModel:
             joblib.dump(self, output_path)
 
     @staticmethod
-    def load(input_path: Path) -> EbmModel:
+    def load(input_path: str) -> EbmModel:
         model = joblib.load(input_path)
         model.client = Duckdb_client(
             db_path=model.db_path,
@@ -472,7 +472,7 @@ class EbmModel:
         )
         return model
 
-    def load2(self, input_path: Path) -> None:
+    def load2(self, input_path: str) -> None:
         import pickle
 
         if not self.model:

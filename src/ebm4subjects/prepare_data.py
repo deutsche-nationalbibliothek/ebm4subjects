@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import polars as pl
 import pyoxigraph
 
@@ -9,8 +7,8 @@ PREF_LABEL_URI = "http://www.w3.org/2004/02/skos/core#prefLabel"
 ALT_LABEL_URI = "http://www.w3.org/2004/02/skos/core#altLabel"
 
 
-def parse_vocab(vocab_path: Path, use_altLabels: bool = True) -> pl.DataFrame:
-    with vocab_path.open("rb") as in_file:
+def parse_vocab(vocab_path: str, use_altLabels: bool = True) -> pl.DataFrame:
+    with open(vocab_path, "rb") as in_file:
         graph = pyoxigraph.parse(input=in_file, format=pyoxigraph.RdfFormat.TURTLE)
         label_ids = []
         label_texts = []
@@ -43,7 +41,7 @@ def add_vocab_embeddings(
     model_name: str,
     embedding_dimensions: int,
     batch_size: int = 1,
-    use_tqdm: bool = False
+    use_tqdm: bool = False,
 ):
     generator = EmbeddingGenerator(model_name, embedding_dimensions)
 
@@ -51,7 +49,7 @@ def add_vocab_embeddings(
         vocab.get_column("label_text").to_list(),
         batch_size=batch_size,
         task="retrieval.query",
-        use_tqdm=use_tqdm
+        use_tqdm=use_tqdm,
     )
 
     return vocab.with_columns(
