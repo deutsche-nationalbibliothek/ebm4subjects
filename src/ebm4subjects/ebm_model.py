@@ -424,7 +424,7 @@ class EbmModel:
 
         return candidates
 
-    def predict(self, candidates: pl.DataFrame) -> pl.DataFrame:
+    def predict(self, candidates: pl.DataFrame) -> list[pl.DataFrame]:
         self.logger.info("Creating matrix of candidates to generate predictions")
         matrix = xgb.DMatrix(
             candidates.select(
@@ -451,6 +451,7 @@ class EbmModel:
             .group_by("doc_id")
             .agg(pl.all().head(self.query_top_k))
             .explode(["label_id", "score"])
+            .partition_by("doc_id")
         )
 
     def save(self, output_path: str, force: bool = False) -> None:
