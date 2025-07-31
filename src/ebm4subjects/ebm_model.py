@@ -1,6 +1,8 @@
-import pickle
+from __future__ import annotations
+
 from pathlib import Path
 
+import joblib
 import polars as pl
 import xgboost as xgb
 
@@ -38,6 +40,7 @@ class EbmModel:
             db_path=db_path,
             config={"hnsw_enable_experimental_persistence": True, "threads": 42},
         )
+        self.db_path = db_path
         self.collection_name = collection_name
 
         self.logger = EbmLogger(log_path, "info").get_logger()
@@ -450,7 +453,28 @@ class EbmModel:
             .explode(["label_id", "score"])
         )
 
-    def load(self, input_path: Path) -> None:
+    def save(self, output_path: Path, force: bool = False) -> None:
+        if output_path.exists() and not force:
+            self.logger.error(
+                f"Cant't save model to {output_path}. Model already exist. Try force=True to overwrite model file."
+            )
+            return
+        else:
+            self.client = None
+            joblib.dump(self, output_path)
+
+    @staticmethod
+    def load(input_path: Path) -> EbmModel:
+        model = joblib.load(input_path)
+        model.client = Duckdb_client(
+            db_path=model.db_path,
+            config={"hnsw_enable_experimental_persistence": True, "threads": 42},
+        )
+        return model
+
+    def load2(self, input_path: Path) -> None:
+        import pickle
+
         if not self.model:
             try:
                 self.model = pickle.load(open(input_path, "rb"))
@@ -467,23 +491,3 @@ class EbmModel:
         else:
             self.logger.error("Cant't load model. Model already loaded.")
             return
-
-    def save(self, output_path: Path, force: bool = False) -> None:
-        if output_path.exists() and not force:
-            self.logger.error(
-                f"Cant't save model to {output_path}. Model already exist. Try force=True to overwrite model file."
-            )
-            return
-        else:
-            try:
-                pickle.dump(self.model, open(output_path, "wb"))
-            except FileNotFoundError:
-                self.logger.error(
-                    f"Cant't save model. Path {output_path} does not exist."
-                )
-                return
-            except PermissionError:
-                self.logger.error(
-                    f"Cant't save model. No permission to write file {output_path}."
-                )
-                return
