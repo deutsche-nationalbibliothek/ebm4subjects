@@ -408,7 +408,7 @@ class EbmModel:
             )
             id_count += len(chunks)
 
-        query_df = (pl.concat(query_dfs),)
+        query_df = pl.concat(query_dfs)
 
         self.logger.info("Running verctor search and creating candidates")
         candidates = self.client.vector_search(
