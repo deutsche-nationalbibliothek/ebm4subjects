@@ -9,6 +9,7 @@ from ebm4subjects.chunker import Chunker
 from ebm4subjects.duckdb_client import Duckdb_client
 from ebm4subjects.ebm_logging import EbmLogger, XGBLogging
 from ebm4subjects.embedding_generator import EmbeddingGenerator
+from tqdm import tqdm
 
 
 class EbmModel:
@@ -330,6 +331,7 @@ class EbmModel:
         text: str,
         doc_id: int,
         collection_name: str,
+        **kwargs
     ) -> pl.DataFrame:
         embedding_generator = EmbeddingGenerator(
             model_name=self.embedding_model_name,
@@ -343,7 +345,7 @@ class EbmModel:
         embeddings = embedding_generator.generate_embeddings(
             texts=text_chunks,
             batch_size=self.embedding_batch_size,
-            task="retrieval.passage",
+            **kwargs
         )
 
         self.logger.info("Creating query dataframe")
@@ -376,6 +378,8 @@ class EbmModel:
         texts: list[str],
         doc_ids: list[int],
         collection_name: str,
+        use_tqdm: bool = False,
+        **kwargs
     ):
         embedding_generator = EmbeddingGenerator(
             model_name=self.embedding_model_name,
@@ -390,7 +394,13 @@ class EbmModel:
         self.logger.info("Creating embeddings for text chunks and query dataframe")
         query_dfs = []
         id_count = 1
-        for doc_id, chunks in zip(doc_ids, text_chunks):
+
+        if use_tqdm:
+            iterator = tqdm(zip(doc_ids, text_chunks), total=len(doc_ids), desc="Generating embeddings")
+        else:
+            iterator = zip(doc_ids, text_chunks)
+
+        for doc_id, chunks in iterator:
             query_dfs.append(
                 pl.DataFrame(
                     {
@@ -401,7 +411,7 @@ class EbmModel:
                         "embeddings": embedding_generator.generate_embeddings(
                             texts=chunks,
                             batch_size=self.embedding_batch_size,
-                            task="retrieval.passage",
+                            **kwargs
                         ),
                     }
                 )
