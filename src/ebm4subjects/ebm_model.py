@@ -33,6 +33,9 @@ class EbmModel:
         xgb_subsample: float,
         xgb_rounds: int,
         xgb_jobs: int,
+        model_args: dict = None,
+        encode_args_vocab: dict = None,
+        encode_args_documents: dict = None
     ) -> None:
         self.client = Duckdb_client(
             db_path=db_path,
@@ -48,6 +51,14 @@ class EbmModel:
             max_sentences=max_sentences,
         )
 
+        self.generator = EmbeddingGenerator(
+            model_name=embedding_model_name,
+            embedding_dimensions=embedding_dimensions,
+            **(model_args if model_args is not None else {})
+        )
+        
+        self.encode_args_vocab = encode_args_vocab
+        self.encode_args_documents = encode_args_documents
         self.use_altLabels = use_altLabels
 
         self.embedding_model_name = embedding_model_name
@@ -71,7 +82,7 @@ class EbmModel:
         vocab_in_path: Path,
         vocab_out_path: Path | None,
         collection_name: str = "my_collection",
-        force: bool = False,
+        force: bool = False
     ) -> None:
         self.logger.info("Parsing vocabulary")
         vocab = prepare_data.parse_vocab(
@@ -82,9 +93,8 @@ class EbmModel:
         self.logger.info("Adding embeddings to vocabulary")
         collection_df = prepare_data.add_vocab_embeddings(
             vocab=vocab,
-            model_name=self.embedding_model_name,
-            embedding_dimensions=self.embedding_dimensions,
-            batch_size=self.embedding_batch_size,
+            generator=self.generator,
+            encode_args=self.encode_args_vocab
         )
 
         if vocab_out_path:
@@ -330,22 +340,17 @@ class EbmModel:
         self,
         text: str,
         doc_id: int,
-        collection_name: str,
-        **kwargs
+        collection_name: str
     ) -> pl.DataFrame:
-        embedding_generator = EmbeddingGenerator(
-            model_name=self.embedding_model_name,
-            embedding_dimensions=self.embedding_dimensions,
-        )
 
         self.logger.info("Chunking text")
         text_chunks = self.chunker.chunk_text(text)
 
         self.logger.info("Creating embeddings for text chunks")
-        embeddings = embedding_generator.generate_embeddings(
+        embeddings = self.generator.generate_embeddings(
             texts=text_chunks,
             batch_size=self.embedding_batch_size,
-            **kwargs
+            **(self.encode_args_documents if self.encode_args_documents is not None else {})
         )
 
         self.logger.info("Creating query dataframe")
@@ -378,13 +383,8 @@ class EbmModel:
         texts: list[str],
         doc_ids: list[int],
         collection_name: str,
-        use_tqdm: bool = False,
-        **kwargs
+        use_tqdm: bool = False
     ):
-        embedding_generator = EmbeddingGenerator(
-            model_name=self.embedding_model_name,
-            embedding_dimensions=self.embedding_dimensions,
-        )
 
         self.logger.info("Chunking texts")
         text_chunks = []
@@ -408,10 +408,10 @@ class EbmModel:
                         "query_doc_id": [doc_id for _ in range(len(chunks))],
                         "chunk_position": [i + 1 for i in range(len(chunks))],
                         "n_chunks": [len(chunks) for _ in range(len(chunks))],
-                        "embeddings": embedding_generator.generate_embeddings(
+                        "embeddings": self.generator.generate_embeddings(
                             texts=chunks,
                             batch_size=self.embedding_batch_size,
-                            **kwargs
+                            **(self.encode_args_documents if self.encode_args_documents is not None else {})
                         ),
                     }
                 )
