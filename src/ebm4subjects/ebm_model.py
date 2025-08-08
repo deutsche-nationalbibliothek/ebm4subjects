@@ -20,7 +20,6 @@ class EbmModel:
         use_altLabels: bool,
         embedding_model_name: str,
         embedding_dimensions: int,
-        embedding_batch_size: int,
         chunk_tokenizer: str,
         max_chunks: int,
         max_chunk_size: int,
@@ -63,7 +62,6 @@ class EbmModel:
 
         self.embedding_model_name = embedding_model_name
         self.embedding_dimensions = embedding_dimensions
-        self.embedding_batch_size = embedding_batch_size
 
         self.max_query_hits = max_query_hits
         self.query_top_k = query_top_k
@@ -349,7 +347,6 @@ class EbmModel:
         self.logger.info("Creating embeddings for text chunks")
         embeddings = self.generator.generate_embeddings(
             texts=text_chunks,
-            batch_size=self.embedding_batch_size,
             **(self.encode_args_documents if self.encode_args_documents is not None else {})
         )
 
@@ -410,7 +407,6 @@ class EbmModel:
                         "n_chunks": [len(chunks) for _ in range(len(chunks))],
                         "embeddings": self.generator.generate_embeddings(
                             texts=chunks,
-                            batch_size=self.embedding_batch_size,
                             **(self.encode_args_documents if self.encode_args_documents is not None else {})
                         ),
                     }
