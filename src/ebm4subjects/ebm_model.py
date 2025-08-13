@@ -1,3 +1,4 @@
+from concurrent.futures import ProcessPoolExecutor
 import pickle
 from pathlib import Path
 
@@ -10,6 +11,8 @@ from ebm4subjects.duckdb_client import Duckdb_client
 from ebm4subjects.ebm_logging import EbmLogger, XGBLogging
 from ebm4subjects.embedding_generator import EmbeddingGenerator
 from tqdm import tqdm
+import numpy as np
+from math import ceil
 
 
 class EbmModel:
@@ -23,6 +26,7 @@ class EbmModel:
         chunk_tokenizer: str,
         max_chunks: int,
         max_chunk_size: int,
+        chunking_jobs: int,
         max_sentences: int,
         max_query_hits: int,
         query_top_k: int,
@@ -49,6 +53,7 @@ class EbmModel:
             max_chunk_size=max_chunk_size,
             max_sentences=max_sentences,
         )
+        self.chunking_jobs = chunking_jobs
 
         self.generator = EmbeddingGenerator(
             model_name=embedding_model_name,
@@ -384,40 +389,39 @@ class EbmModel:
         doc_ids: list[int],
         collection_name: str,
         use_tqdm: bool = False
-    ):
+    )  -> pl.DataFrame:
 
-        self.logger.info("Chunking texts")
+        self.logger.info("Chunking texts in batches")
         text_chunks = []
-        for text in texts:
-            text_chunks.append(self.chunker.chunk_text(text))
+        chunk_index = []
 
+        num_batches = self.chunking_jobs
+        chunking_batch_size = ceil(len(texts) / num_batches)
+        batch_args = [
+            (doc_ids[i*chunking_batch_size:(i+1)*chunking_batch_size], texts[i*chunking_batch_size:(i+1)*chunking_batch_size], self.chunker)
+            for i in range(num_batches)
+        ]
+
+        # Use ProcessPoolExecutor for true parallelism
+        with ProcessPoolExecutor(max_workers=self.query_jobs) as executor:
+            results = list(executor.map(_chunk_batch, batch_args))
+
+        for batch_chunks, batch_chunk_indices in results:
+            text_chunks.extend(batch_chunks)
+            chunk_index.extend(batch_chunk_indices)
+
+        chunk_index = pl.concat(chunk_index).with_row_index("query_id")
         self.logger.info("Creating embeddings for text chunks and query dataframe")
-        query_dfs = []
-        id_count = 1
-
-        if use_tqdm:
-            iterator = tqdm(zip(doc_ids, text_chunks), total=len(doc_ids), desc="Generating embeddings")
-        else:
-            iterator = zip(doc_ids, text_chunks)
-
-        for doc_id, chunks in iterator:
-            query_dfs.append(
-                pl.DataFrame(
-                    {
-                        "query_id": [i + id_count for i in range(len(chunks))],
-                        "query_doc_id": [doc_id for _ in range(len(chunks))],
-                        "chunk_position": [i + 1 for i in range(len(chunks))],
-                        "n_chunks": [len(chunks) for _ in range(len(chunks))],
-                        "embeddings": self.generator.generate_embeddings(
-                            texts=chunks,
-                            **(self.encode_args_documents if self.encode_args_documents is not None else {})
-                        ),
-                    }
-                )
-            )
-            id_count += len(chunks)
-
-        query_df = pl.concat(query_dfs)
+        
+        embeddings = self.generator.generate_embeddings(
+            texts=text_chunks,
+            **(self.encode_args_documents if self.encode_args_documents is not None else {})
+        )
+        
+        # Extend chunk_index by a list column containing the embeddings
+        query_df = chunk_index.with_columns(
+            pl.Series("embeddings", embeddings)
+        )
 
         self.logger.info("Running verctor search and creating candidates")
         candidates = self.client.vector_search(
@@ -500,3 +504,19 @@ class EbmModel:
                     f"Cant't save model. No permission to write file {output_path}."
                 )
                 return
+            
+def _chunk_batch(args):
+    batch_doc_ids, batch_texts, chunker = args
+    batch_chunks = []
+    batch_chunk_indices = []
+    for doc_id, text in tqdm(zip(batch_doc_ids, batch_texts), total=len(batch_doc_ids), desc="Chunking batch"):
+        new_chunks = chunker.chunk_text(text)
+        n_chunks = len(new_chunks)
+        chunk_df = pl.DataFrame({
+            "query_doc_id": [doc_id]*n_chunks,
+            "chunk_position": list(range(n_chunks)),
+            "n_chunks": [n_chunks]*n_chunks
+        })
+        batch_chunks.extend(new_chunks)
+        batch_chunk_indices.append(chunk_df)
+    return batch_chunks, batch_chunk_indices
