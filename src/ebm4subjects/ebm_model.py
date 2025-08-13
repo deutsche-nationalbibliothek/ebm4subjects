@@ -153,6 +153,7 @@ class EbmModel:
                 pl.col("suggested").fill_null(False),
                 pl.col("gold").fill_null(False),
             )
+            .filter(pl.col("suggested") == True)
         )
 
     def _read_long_document_format(
@@ -283,6 +284,7 @@ class EbmModel:
                     "last_occurence",
                     "spread",
                     "is_prefLabel",
+                    "n_chunks",
                     "gold",
                 ]
             )
@@ -303,6 +305,7 @@ class EbmModel:
                     "last_occurence",
                     "spread",
                     "is_prefLabel",
+                    "n_chunks"
                 ]
             ).to_pandas(),
             train_data.to_pandas()["gold"],
@@ -443,6 +446,7 @@ class EbmModel:
                     "last_occurence",
                     "spread",
                     "is_prefLabel",
+                    "n_chunks"
                 ]
             )
         )
