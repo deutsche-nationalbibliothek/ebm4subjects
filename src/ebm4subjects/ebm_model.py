@@ -253,18 +253,23 @@ class EbmModel:
 
     def prepare_train(
         self,
-        train_texts: list[str],
-        train_doc_ids: list[str],
         collection_name: str,
         gold_doc_ids: list[str],
         gold_label_ids: list[str],
+        train_texts: list[str] = None,
+        train_doc_ids: list[str] = None,
+        train_candidates: pl.DataFrame = None,
     ) -> pl.DataFrame:
         self.logger.info("Preparing training data.")
-        train_candidates = self._prepare_train_data(
-            texts=train_texts,
-            doc_ids=train_doc_ids,
-            collection_name=collection_name,
-        )
+        if train_candidates is None:
+            if train_texts is None or train_doc_ids is None:
+                self.logger.error("Training texts or document IDs are missing.")
+                return
+            train_candidates = self._prepare_train_data(
+                texts=train_texts,
+                doc_ids=train_doc_ids,
+                collection_name=collection_name,
+            )
 
         self.logger.info("Preparing gold standard.")
         gold_standard = pl.DataFrame(
