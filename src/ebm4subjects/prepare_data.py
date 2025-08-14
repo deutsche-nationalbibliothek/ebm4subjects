@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import polars as pl
 import pyoxigraph
 
@@ -9,8 +7,8 @@ PREF_LABEL_URI = "http://www.w3.org/2004/02/skos/core#prefLabel"
 ALT_LABEL_URI = "http://www.w3.org/2004/02/skos/core#altLabel"
 
 
-def parse_vocab(vocab_path: Path, use_altLabels: bool = True) -> pl.DataFrame:
-    with vocab_path.open("rb") as in_file:
+def parse_vocab(vocab_path: str, use_altLabels: bool = True) -> pl.DataFrame:
+    with open(vocab_path, "rb") as in_file:
         graph = pyoxigraph.parse(input=in_file, format=pyoxigraph.RdfFormat.TURTLE)
         label_ids = []
         label_texts = []

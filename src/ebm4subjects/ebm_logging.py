@@ -1,11 +1,10 @@
 import logging
-from pathlib import Path
 
 import xgboost
 
 
 class EbmLogger:
-    def __init__(self, log_path: Path, level: str = "info") -> None:
+    def __init__(self, log_path: str, level: str = "info") -> None:
         self.logger = logging.getLogger(__name__)
 
         if level == "error":

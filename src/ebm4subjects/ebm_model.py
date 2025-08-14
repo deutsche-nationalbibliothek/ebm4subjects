@@ -1,7 +1,10 @@
 from concurrent.futures import ProcessPoolExecutor
 import pickle
+from __future__ import annotations
+
 from pathlib import Path
 
+import joblib
 import polars as pl
 import xgboost as xgb
 
@@ -18,8 +21,9 @@ from math import ceil
 class EbmModel:
     def __init__(
         self,
-        db_path: Path,
-        log_path: Path,
+        db_path: str,
+        collection_name: str,
+        log_path: str | None,
         use_altLabels: bool,
         embedding_model_name: str,
         embedding_dimensions: int,
@@ -42,10 +46,18 @@ class EbmModel:
     ) -> None:
         self.client = Duckdb_client(
             db_path=db_path,
-            config={"hnsw_enable_experimental_persistence": True},
+            config={"hnsw_enable_experimental_persistence": True, "threads": 42},
         )
+        self.db_path = db_path
+        self.collection_name = collection_name
 
-        self.logger = EbmLogger(log_path, "info").get_logger()
+        self.logger = None
+        self.xgb_logger = None
+        self.xgb_callbacks = None
+        if log_path:
+            self.logger = EbmLogger(log_path, "info").get_logger()
+            self.xgb_logger = XGBLogging(self.logger, epoch_log_interval=1)
+            self.xgb_callbacks = [self.xgb_logger]
 
         self.chunker = Chunker(
             tokenizer=chunk_tokenizer,
@@ -82,18 +94,19 @@ class EbmModel:
 
     def create_vector_db(
         self,
-        vocab_in_path: Path,
-        vocab_out_path: Path | None,
-        collection_name: str = "my_collection",
-        force: bool = False
+        vocab_in_path: str,
+        vocab_out_path: str | None = None,
+        force: bool = False,
     ) -> None:
-        self.logger.info("Parsing vocabulary")
+        if self.logger:
+            self.logger.info("Parsing vocabulary")
         vocab = prepare_data.parse_vocab(
             vocab_path=vocab_in_path,
             use_altLabels=self.use_altLabels,
         )
 
-        self.logger.info("Adding embeddings to vocabulary")
+        if self.logger:
+            self.logger.info("Adding embeddings to vocabulary")
         collection_df = prepare_data.add_vocab_embeddings(
             vocab=vocab,
             generator=self.generator,
@@ -102,21 +115,25 @@ class EbmModel:
 
         if vocab_out_path:
             try:
-                self.logger.info(f"Try saving vocabulary to {vocab_out_path}")
+                if self.logger:
+                    self.logger.info(f"Try saving vocabulary to {vocab_out_path}")
                 collection_df.write_ipc(vocab_out_path)
             except FileNotFoundError:
-                self.logger.error(
-                    f"Cant't save vocabulary. Path {vocab_out_path} does not exist."
-                )
+                if self.logger:
+                    self.logger.error(
+                        f"Cant't save vocabulary. Path {vocab_out_path} does not exist."
+                    )
             except PermissionError:
-                self.logger.error(
-                    f"Cant't save voacbulary. No permission to write file {vocab_out_path}."
-                )
+                if self.logger:
+                    self.logger.error(
+                        f"Cant't save voacbulary. No permission to write file {vocab_out_path}."
+                    )
 
-        self.logger.info("Creating collection")
+        if self.logger:
+            self.logger.info("Creating collection")
         self.client.create_collection(
             collection_df=collection_df,
-            collection_name=collection_name,
+            collection_name=self.collection_name,
             embedding_dimensions=self.embedding_dimensions,
             hnsw_index_name="hnsw_index",
             hnsw_metric="cosine",
@@ -127,7 +144,6 @@ class EbmModel:
         self,
         texts: list[str],
         doc_ids: list[int],
-        collection_name: str,
     ) -> pl.DataFrame:
         candidates_dfs = []
 
@@ -136,7 +152,6 @@ class EbmModel:
                 self.generate_candidates(
                     text=text,
                     doc_id=doc_id,
-                    collection_name=collection_name,
                 )
             )
 
@@ -163,8 +178,8 @@ class EbmModel:
 
     def _read_long_document_format(
         self,
-        path_to_document_file: Path,
-        path_to_index_file: Path,
+        path_to_document_file: str,
+        path_to_index_file: str,
     ) -> pl.DataFrame:
         documents = (
             pl.read_csv(
@@ -189,9 +204,8 @@ class EbmModel:
 
     def prepare_train_from_docs(
         self,
-        path_to_document_file: Path,
-        path_to_index_file: Path,
-        collection_name: str = "my_collection",
+        path_to_document_file: str,
+        path_to_index_file: str,
     ) -> pl.DataFrame:
         try:
             documents = self._read_long_document_format(
@@ -199,13 +213,18 @@ class EbmModel:
                 path_to_index_file,
             )
         except FileNotFoundError:
-            self.logger.error("Cant't load data. Files do not exist.")
+            if self.logger:
+                self.logger.error("Cant't load data. Files do not exist.")
             return
         except PermissionError:
-            self.logger.error("Cant't load data. No permission to read files.")
+            if self.logger:
+                self.logger.error("Cant't load data. No permission to read files.")
             return
 
-        self.logger.info("Extracting training data and gold standard from documents")
+        if self.logger:
+            self.logger.info(
+                "Extracting training data and gold standard from documents"
+            )
         train_texts = documents.get_column("text").to_list()
         train_doc_ids = documents.get_column("idn").to_list()
         gold_label_ids = [
@@ -214,22 +233,26 @@ class EbmModel:
         ]
         gold_doc_ids = documents.get_column("idn").to_list()
 
-        self.logger.info("Preparing training data.")
+        if self.logger:
+            self.logger.info("Preparing training data.")
         train_candidates = self._prepare_train_data(
             texts=train_texts,
             doc_ids=train_doc_ids,
-            collection_name=collection_name,
         )
 
-        self.logger.info("Preparing gold standard.")
+        if self.logger:
+            self.logger.info("Preparing gold standard.")
         gold_standard = pl.DataFrame(
             {
                 "doc_id": gold_doc_ids,
                 "label_id": gold_label_ids,
-            }
+            },
+        ).with_columns(
+            pl.col("doc_id").cast(pl.String), pl.col("label_id").cast(pl.String)
         )
 
-        self.logger.info("Prepare training data and gold standard for training")
+        if self.logger:
+            self.logger.info("Prepare training data and gold standard for training")
         training_data = (
             self._compare_to_gold_standard(train_candidates, gold_standard)
             .with_columns(pl.when(pl.col("gold")).then(1).otherwise(0).alias("gold"))
@@ -253,33 +276,39 @@ class EbmModel:
 
     def prepare_train(
         self,
-        collection_name: str,
         gold_doc_ids: list[str],
         gold_label_ids: list[str],
         train_texts: list[str] = None,
         train_doc_ids: list[str] = None,
         train_candidates: pl.DataFrame = None,
     ) -> pl.DataFrame:
-        self.logger.info("Preparing training data.")
+
+        if self.logger:
+            self.logger.info("Preparing training data.")
         if train_candidates is None:
             if train_texts is None or train_doc_ids is None:
-                self.logger.error("Training texts or document IDs are missing.")
+                if self.logger:
+                    self.logger.error("Training texts or document IDs are missing.")
                 return
             train_candidates = self._prepare_train_data(
                 texts=train_texts,
-                doc_ids=train_doc_ids,
-                collection_name=collection_name,
+                doc_ids=train_doc_ids
             )
 
-        self.logger.info("Preparing gold standard.")
+
+        if self.logger:
+            self.logger.info("Preparing gold standard.")
         gold_standard = pl.DataFrame(
             {
                 "doc_id": gold_doc_ids,
                 "label_id": gold_label_ids,
             }
+        ).with_columns(
+            pl.col("doc_id").cast(pl.String), pl.col("label_id").cast(pl.String)
         )
 
-        self.logger.info("Prepare training data and gold standard for training.")
+        if self.logger:
+            self.logger.info("Prepare training data and gold standard for training.")
         training_data = (
             self._compare_to_gold_standard(train_candidates, gold_standard)
             .with_columns(pl.when(pl.col("gold")).then(1).otherwise(0).alias("gold"))
@@ -303,7 +332,8 @@ class EbmModel:
         return training_data
 
     def train(self, train_data: pl.DataFrame) -> None:
-        self.logger.info("Creating training matrix")
+        if self.logger:
+            self.logger.info("Creating training matrix")
         matrix = xgb.DMatrix(
             train_data.select(
                 [
@@ -322,7 +352,8 @@ class EbmModel:
         )
 
         try:
-            self.logger.info("Starting training of XGBoost Ranker")
+            if self.logger:
+                self.logger.info("Starting training of XGBoost Ranker")
             model = xgb.train(
                 params={
                     "objective": "binary:logistic",
@@ -336,13 +367,15 @@ class EbmModel:
                 verbose_eval=False,
                 evals=[(matrix, "train")],
                 num_boost_round=self.train_rounds,
-                callbacks=[XGBLogging(self.logger, epoch_log_interval=1)],
+                callbacks=self.xgb_callbacks,
             )
-            self.logger.info("Training successful finished")
+            if self.logger:
+                self.logger.info("Training successful finished")
         except xgb.core.XGBoostError:
-            self.logger.critical(
-                """XGBoost can't train with candidates equal to gold standard or candidates with no match to gold standard at all. Please check if your training data and gold standard are correct."""
-            )
+            if self.logger:
+                self.logger.critical(
+                    """XGBoost can't train with candidates equal to gold standard or candidates with no match to gold standard at all. Please check if your training data and gold standard are correct."""
+                )
             return
 
         self.model = model
@@ -351,19 +384,21 @@ class EbmModel:
         self,
         text: str,
         doc_id: int,
-        collection_name: str
     ) -> pl.DataFrame:
 
-        self.logger.info("Chunking text")
+        if self.logger:
+            self.logger.info("Chunking text")
         text_chunks = self.chunker.chunk_text(text)
 
-        self.logger.info("Creating embeddings for text chunks")
+        if self.logger:
+            self.logger.info("Creating embeddings for text chunks")
         embeddings = self.generator.generate_embeddings(
             texts=text_chunks,
             **(self.encode_args_documents if self.encode_args_documents is not None else {})
         )
 
-        self.logger.info("Creating query dataframe")
+        if self.logger:
+            self.logger.info("Creating query dataframe")
         query_df = pl.DataFrame(
             {
                 "query_id": [i + 1 for i in range(len(text_chunks))],
@@ -374,10 +409,11 @@ class EbmModel:
             }
         )
 
-        self.logger.info("Running verctor search and creating candidates")
+        if self.logger:
+            self.logger.info("Running verctor search and creating candidates")
         candidates = self.client.vector_search(
             query_df=query_df,
-            collection_name=collection_name,
+            collection_name=self.collection_name,
             embedding_dimensions=self.embedding_dimensions,
             n_jobs=self.query_jobs,
             n_hits=self.max_query_hits,
@@ -392,11 +428,12 @@ class EbmModel:
         self,
         texts: list[str],
         doc_ids: list[int],
-        collection_name: str,
         use_tqdm: bool = False
     )  -> pl.DataFrame:
 
-        self.logger.info("Chunking texts in batches")
+        if self.logger:
+            self.logger.info("Chunking texts in batches")
+
         text_chunks = []
         chunk_index = []
 
@@ -428,10 +465,11 @@ class EbmModel:
             pl.Series("embeddings", embeddings)
         )
 
-        self.logger.info("Running verctor search and creating candidates")
+        if self.logger:
+            self.logger.info("Running verctor search and creating candidates")
         candidates = self.client.vector_search(
             query_df=query_df,
-            collection_name=collection_name,
+            collection_name=self.collection_name,
             embedding_dimensions=self.embedding_dimensions,
             n_jobs=self.query_jobs,
             n_hits=self.max_query_hits,
@@ -442,8 +480,9 @@ class EbmModel:
 
         return candidates
 
-    def predict(self, candidates: pl.DataFrame) -> pl.DataFrame:
-        self.logger.info("Creating matrix of candidates to generate predictions")
+    def predict(self, candidates: pl.DataFrame) -> list[pl.DataFrame]:
+        if self.logger:
+            self.logger.info("Creating matrix of candidates to generate predictions")
         matrix = xgb.DMatrix(
             candidates.select(
                 [
@@ -460,7 +499,8 @@ class EbmModel:
             )
         )
 
-        self.logger.info("Making predictions for candidates")
+        if self.logger:
+            self.logger.info("Making predictions for candidates")
         predictions = self.model.predict(matrix)
 
         return (
@@ -470,46 +510,29 @@ class EbmModel:
             .group_by("doc_id")
             .agg(pl.all().head(self.query_top_k))
             .explode(["label_id", "score"])
+            .partition_by("doc_id")
         )
 
-    def load(self, input_path: Path) -> None:
-        if not self.model:
-            try:
-                self.model = pickle.load(open(input_path, "rb"))
-            except FileNotFoundError:
+    def save(self, output_path: str, force: bool = False) -> None:
+        if Path(output_path).exists() and not force:
+            if self.logger:
                 self.logger.error(
-                    f"Cant't load model. File {input_path} does not exist."
+                    f"Cant't save model to {output_path}. Model already exist. Try force=True to overwrite model file."
                 )
-                return
-            except PermissionError:
-                self.logger.error(
-                    f"Cant't load model. No permission to read file {input_path}."
-                )
-                return
-        else:
-            self.logger.error("Cant't load model. Model already loaded.")
             return
+        else:
+            self.client = None
+            joblib.dump(self, output_path)
 
-    def save(self, output_path: Path, force: bool = False) -> None:
-        if output_path.exists() and not force:
-            self.logger.error(
-                f"Cant't save model to {output_path}. Model already exist. Try force=True to overwrite model file."
-            )
-            return
-        else:
-            try:
-                pickle.dump(self.model, open(output_path, "wb"))
-            except FileNotFoundError:
-                self.logger.error(
-                    f"Cant't save model. Path {output_path} does not exist."
-                )
-                return
-            except PermissionError:
-                self.logger.error(
-                    f"Cant't save model. No permission to write file {output_path}."
-                )
-                return
-            
+    @staticmethod
+    def load(input_path: str) -> EbmModel:
+        model = joblib.load(input_path)
+        model.client = Duckdb_client(
+            db_path=model.db_path,
+            config={"hnsw_enable_experimental_persistence": True, "threads": 42},
+        )
+        return model
+
 def _chunk_batch(args):
     batch_doc_ids, batch_texts, chunker = args
     batch_chunks = []
