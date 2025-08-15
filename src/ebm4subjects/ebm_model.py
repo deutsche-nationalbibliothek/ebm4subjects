@@ -16,6 +16,7 @@ from ebm4subjects.embedding_generator import EmbeddingGenerator
 from tqdm import tqdm
 import numpy as np
 from math import ceil
+import warnings
 
 
 class EbmModel:
@@ -44,10 +45,8 @@ class EbmModel:
         encode_args_vocab: dict = None,
         encode_args_documents: dict = None
     ) -> None:
-        self.client = Duckdb_client(
-            db_path=db_path,
-            config={"hnsw_enable_experimental_persistence": True, "threads": 42},
-        )
+        self.client = None
+        self.generator = None
         self.db_path = db_path
         self.collection_name = collection_name
         self.embedding_model_name = embedding_model_name
@@ -70,8 +69,6 @@ class EbmModel:
         )
         self.chunking_jobs = chunking_jobs
 
-        self.generator = self.init_generator()
-
         self.encode_args_vocab = encode_args_vocab
         self.encode_args_documents = encode_args_documents
         self.use_altLabels = use_altLabels
@@ -91,15 +88,25 @@ class EbmModel:
 
         self.model = None
 
-    def init_generator(self):
+    def init_generator(self) -> None:
         if self.logger:
             self.logger.info("Initializing embedding generator")
 
-        return EmbeddingGenerator(
+        self.generator = EmbeddingGenerator(
             model_name=self.embedding_model_name,
             embedding_dimensions=self.embedding_dimensions,
             **self.model_args
         )
+
+    def init_duckdb_client(self) -> None:
+        if self.logger:
+            self.logger.info("Initializing DuckDB client")
+
+        self.client = Duckdb_client(
+            db_path=self.db_path,
+            config={"hnsw_enable_experimental_persistence": True, "threads": 42}
+        )
+
 
     def create_vector_db(
         self,
@@ -401,6 +408,12 @@ class EbmModel:
 
         if self.logger:
             self.logger.info("Creating embeddings for text chunks")
+
+        self.check_multi_device()
+
+        if self.generator is None:
+            self.init_generator()
+
         embeddings = self.generator.generate_embeddings(
             texts=text_chunks,
             **(self.encode_args_documents if self.encode_args_documents is not None else {})
@@ -419,7 +432,11 @@ class EbmModel:
         )
 
         if self.logger:
-            self.logger.info("Running verctor search and creating candidates")
+            self.logger.info("Running vector search and creating candidates")
+
+        if self.client is None:
+            self.init_duckdb_client()
+
         candidates = self.client.vector_search(
             query_df=query_df,
             collection_name=self.collection_name,
@@ -463,7 +480,10 @@ class EbmModel:
 
         chunk_index = pl.concat(chunk_index).with_row_index("query_id")
         self.logger.info("Creating embeddings for text chunks and query dataframe")
-        
+
+        if self.generator is None:
+            self.init_generator()
+
         embeddings = self.generator.generate_embeddings(
             texts=text_chunks,
             **(self.encode_args_documents if self.encode_args_documents is not None else {})
@@ -476,6 +496,16 @@ class EbmModel:
 
         if self.logger:
             self.logger.info("Running verctor search and creating candidates")
+
+        # with multi-GPU processing in the generate embeddings process
+        # duckdb may throw an error due to its incompatible handling of
+        # multiple threads. Therefore late initialization of the client
+        # is required.
+        if self.client is None:
+            self.init_duckdb_client()
+        else:
+            self.check_multi_device()
+
         candidates = self.client.vector_search(
             query_df=query_df,
             collection_name=self.collection_name,
@@ -537,14 +567,22 @@ class EbmModel:
     @staticmethod
     def load(input_path: str, load_generator: bool = True) -> EbmModel:
         model = joblib.load(input_path)
-        model.client = Duckdb_client(
-            db_path=model.db_path,
-            config={"hnsw_enable_experimental_persistence": True, "threads": 42},
-        )
+        model.client = model.init_duckdb_client()
         if load_generator:
             model.generator = model.init_generator()
 
         return model
+
+    def check_multi_device(self):
+        if self.encode_args_documents is not None and "device" in self.encode_args_documents:
+            device_val = self.encode_args_documents["device"]
+            if isinstance(device_val, list) and len(device_val) > 1:
+                warnings.warn(
+                    "Multi-device (multi-GPU/CPU) processing may cause conflicts in "
+                    "generate_candidates or with duckdb multithreading if the database "
+                    "client is already initialized. Set enocding args to single device "
+                    "or use generate_candidates_batch"
+                )
 
 def _chunk_batch(args):
     batch_doc_ids, batch_texts, chunker = args
