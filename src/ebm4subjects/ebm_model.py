@@ -50,6 +50,8 @@ class EbmModel:
         )
         self.db_path = db_path
         self.collection_name = collection_name
+        self.embedding_model_name = embedding_model_name
+        self.embedding_dimensions = embedding_dimensions
 
         self.logger = None
         self.xgb_logger = None
