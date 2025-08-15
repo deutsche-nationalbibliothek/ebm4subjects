@@ -1,6 +1,6 @@
+from __future__ import annotations
 from concurrent.futures import ProcessPoolExecutor
 import pickle
-from __future__ import annotations
 
 from pathlib import Path
 
