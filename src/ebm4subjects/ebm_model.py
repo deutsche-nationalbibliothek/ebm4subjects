@@ -52,6 +52,7 @@ class EbmModel:
         self.collection_name = collection_name
         self.embedding_model_name = embedding_model_name
         self.embedding_dimensions = embedding_dimensions
+        self.model_args = model_args if model_args is not None else {}
 
         self.logger = None
         self.xgb_logger = None
