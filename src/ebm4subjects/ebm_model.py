@@ -67,12 +67,8 @@ class EbmModel:
         )
         self.chunking_jobs = chunking_jobs
 
-        self.generator = EmbeddingGenerator(
-            model_name=embedding_model_name,
-            embedding_dimensions=embedding_dimensions,
-            **(model_args if model_args is not None else {})
-        )
-        
+        self.generator = self.init_generator()
+
         self.encode_args_vocab = encode_args_vocab
         self.encode_args_documents = encode_args_documents
         self.use_altLabels = use_altLabels
@@ -91,6 +87,16 @@ class EbmModel:
         self.train_jobs = xgb_jobs
 
         self.model = None
+
+    def init_generator(self):
+        if self.logger:
+            self.logger.info("Initializing embedding generator")
+
+        return EmbeddingGenerator(
+            model_name=self.embedding_model_name,
+            embedding_dimensions=self.embedding_dimensions,
+            **self.model_args
+        )
 
     def create_vector_db(
         self,
@@ -522,15 +528,19 @@ class EbmModel:
             return
         else:
             self.client = None
+            self.generator = None
             joblib.dump(self, output_path)
 
     @staticmethod
-    def load(input_path: str) -> EbmModel:
+    def load(input_path: str, load_generator: bool = True) -> EbmModel:
         model = joblib.load(input_path)
         model.client = Duckdb_client(
             db_path=model.db_path,
             config={"hnsw_enable_experimental_persistence": True, "threads": 42},
         )
+        if load_generator:
+            model.generator = model.init_generator()
+
         return model
 
 def _chunk_batch(args):
