@@ -33,6 +33,7 @@ class EbmModel:
         max_chunk_size: int,
         chunking_jobs: int,
         max_sentences: int,
+        hnsw_index_params: dict,
         max_query_hits: int,
         query_top_k: int,
         query_jobs: int,
@@ -49,6 +50,7 @@ class EbmModel:
         self.generator = None
         self.db_path = db_path
         self.collection_name = collection_name
+        self.hnsw_index_params = hnsw_index_params
         self.embedding_model_name = embedding_model_name
         self.embedding_dimensions = embedding_dimensions
         self.model_args = model_args if model_args is not None else {}
@@ -104,7 +106,8 @@ class EbmModel:
 
         self.client = Duckdb_client(
             db_path=self.db_path,
-            config={"hnsw_enable_experimental_persistence": True, "threads": 42}
+            config={"hnsw_enable_experimental_persistence": True, "threads": 42},
+            hnsw_index_params=self.hnsw_index_params
         )
 
 
@@ -445,7 +448,7 @@ class EbmModel:
             n_hits=self.max_query_hits,
             chunk_size=1024,
             top_k=self.query_top_k,
-            hnsw_metric_function="array_cosine_distance",
+            hnsw_metric_function="array_cosine_distance"
         )
 
         return candidates
@@ -514,7 +517,7 @@ class EbmModel:
             n_hits=self.max_query_hits,
             chunk_size=1024,
             top_k=self.query_top_k,
-            hnsw_metric_function="array_cosine_distance",
+            hnsw_metric_function="array_cosine_distance"
         )
 
         return candidates
