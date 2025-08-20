@@ -9,6 +9,7 @@ class Duckdb_client:
         self,
         db_path: str,
         config: dict = {},
+        hnsw_index_params: dict = {"M": 32, "ef_construction": 256, "ef_search": 256},
     ) -> None:
         self.connection = duckdb.connect(
             database=db_path,
@@ -17,6 +18,7 @@ class Duckdb_client:
 
         self.connection.install_extension("vss")
         self.connection.load_extension("vss")
+        self.hnsw_index_params = hnsw_index_params
 
     def create_collection(
         self,
@@ -50,7 +52,7 @@ class Duckdb_client:
             f"""CREATE INDEX IF NOT EXISTS {hnsw_index_name}
             ON {collection_name}
             USING HNSW (embeddings)
-            WITH (metric = '{hnsw_metric}')"""
+            WITH (metric = '{hnsw_metric}', M = {self.hnsw_index_params["M"]}, ef_construction = {self.hnsw_index_params["ef_construction"]})"""
         )
 
     def vector_search(
@@ -190,6 +192,10 @@ class Duckdb_client:
         if limit < 100:
             # apply oversearch to reduce sensitivity in MinMax scaling
             limit = 100
+
+        thread_connection.execute(
+            f"SET hnsw_ef_search = {self.hnsw_index_params['ef_search']}"
+        )
 
         thread_connection.execute(
             f"""INSERT INTO results
