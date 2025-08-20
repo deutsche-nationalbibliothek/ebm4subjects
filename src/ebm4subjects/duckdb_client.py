@@ -8,7 +8,7 @@ class Duckdb_client:
     def __init__(
         self,
         db_path: str,
-        config: dict = {},
+        config: dict = {"hnsw_enable_experimental_persistence": True, "threads": 1},
         hnsw_index_params: dict = {"M": 32, "ef_construction": 256, "ef_search": 256},
     ) -> None:
         self.connection = duckdb.connect(

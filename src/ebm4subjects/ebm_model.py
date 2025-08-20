@@ -115,8 +115,6 @@ class EbmModel:
                 },
                 hnsw_index_params=self.hnsw_index_params,
             )
-        elif self.logger:
-            self.logger.info("DuckDB client already initialized")
 
     def _init_generator(self) -> None:
         if self.generator is None:
@@ -128,8 +126,6 @@ class EbmModel:
                 embedding_dimensions=self.embedding_dimensions,
                 **self.model_args,
             )
-        elif self.logger:
-            self.logger.info("Embedding generator already initialized")
 
     def create_vector_db(
         self,
@@ -137,35 +133,43 @@ class EbmModel:
         vocab_out_path: str | None = None,
         force: bool = False,
     ) -> None:
-        if self.logger:
-            self.logger.info("Parsing vocabulary")
-        vocab = prepare_data.parse_vocab(
-            vocab_path=vocab_in_path,
-            use_altLabels=self.use_altLabels,
-        )
+        if vocab_out_path and Path(vocab_out_path).exists():
+            if self.logger:
+                self.logger.info(
+                    f"Loading vocabulary with embeddings from {vocab_out_path}."
+                )
+            collection_df = pl.read_ipc(vocab_out_path)
+        else:
+            if self.logger:
+                self.logger.info("Parsing vocabulary")
+            vocab = prepare_data.parse_vocab(
+                vocab_path=vocab_in_path,
+                use_altLabels=self.use_altLabels,
+            )
 
-        if self.logger:
-            self.logger.info("Adding embeddings to vocabulary")
-        collection_df = prepare_data.add_vocab_embeddings(
-            vocab=vocab, generator=self.generator, encode_args=self.encode_args_vocab
-        )
+            if self.logger:
+                self.logger.info("Adding embeddings to vocabulary")
+            if self.generator is None:
+                self._init_generator()
+            collection_df = prepare_data.add_vocab_embeddings(
+                vocab=vocab,
+                generator=self.generator,
+                encode_args=self.encode_args_vocab,
+            )
 
-        if vocab_out_path:
-            try:
-                if self.logger:
-                    self.logger.info(f"Try saving vocabulary to {vocab_out_path}")
-                collection_df.write_ipc(vocab_out_path)
-            except FileNotFoundError:
-                if self.logger:
-                    self.logger.error(
-                        f"Cant't save vocabulary. Path {vocab_out_path} does not exist."
-                    )
-            except PermissionError:
-                if self.logger:
-                    self.logger.error(
-                        f"Cant't save voacbulary. No permission to write file {vocab_out_path}."
-                    )
+            if vocab_out_path:
+                if Path(vocab_out_path).exists() and not force:
+                    if self.logger:
+                        self.logger.warn(
+                            f"Cant't save vocabulary to {vocab_out_path}. File already exists."
+                        )
+                else:
+                    if self.logger:
+                        self.logger.info(f"Saving vocabulary to {vocab_out_path}")
+                    collection_df.write_ipc(vocab_out_path)
 
+        if self.client is None:
+            self._init_duckdb_client()
         if self.logger:
             self.logger.info("Creating collection")
         self.client.create_collection(
@@ -615,7 +619,7 @@ class EbmModel:
         if Path(output_path).exists() and not force:
             if self.logger:
                 self.logger.warn(
-                    f"Cant't save model to {output_path}. Model already exist. Try force=True to overwrite model file."
+                    f"Cant't save model to {output_path}. Model already exists. Try force=True to overwrite model file."
                 )
             return
         else:

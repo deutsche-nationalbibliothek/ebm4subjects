@@ -1,10 +1,8 @@
 import polars as pl
 import pyoxigraph
+from rdflib.namespace import SKOS
 
 from ebm4subjects.embedding_generator import EmbeddingGenerator
-
-PREF_LABEL_URI = "http://www.w3.org/2004/02/skos/core#prefLabel"
-ALT_LABEL_URI = "http://www.w3.org/2004/02/skos/core#altLabel"
 
 
 def parse_vocab(vocab_path: str, use_altLabels: bool = True) -> pl.DataFrame:
@@ -15,16 +13,13 @@ def parse_vocab(vocab_path: str, use_altLabels: bool = True) -> pl.DataFrame:
         pref_labels = []
 
         for identifier, predicate, label, _ in graph:
-            label_id = identifier.value.split("/")[-1]
-            label_text = label.value
-
-            if predicate.value == PREF_LABEL_URI:
-                label_ids.append(label_id)
-                label_texts.append(label_text)
+            if predicate.value == str(SKOS.prefLabel):
+                label_ids.append(identifier.value)
+                label_texts.append(label.value)
                 pref_labels.append(True)
-            elif predicate.value == ALT_LABEL_URI and use_altLabels:
-                label_ids.append(label_id)
-                label_texts.append(label_text)
+            elif predicate.value == str(SKOS.altLabel) and use_altLabels:
+                label_ids.append(identifier.value)
+                label_texts.append(label.value)
                 pref_labels.append(False)
 
     return pl.DataFrame(

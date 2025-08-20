@@ -15,6 +15,4 @@ class EmbeddingGenerator:
         if not texts:
             return np.empty((0, self.embedding_dimensions))
 
-        embeddings = self.model.encode(texts, **kwargs)
-
-        return embeddings
+        return self.model.encode(texts, **kwargs)
