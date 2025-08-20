@@ -38,18 +38,13 @@ def parse_vocab(vocab_path: str, use_altLabels: bool = True) -> pl.DataFrame:
 
 def add_vocab_embeddings(
     vocab: pl.DataFrame,
-    model_name: str,
-    embedding_dimensions: int,
-    batch_size: int = 1,
-    use_tqdm: bool = False,
+    generator: EmbeddingGenerator,
+    encode_args: dict = None
 ):
-    generator = EmbeddingGenerator(model_name, embedding_dimensions)
 
     embeddings = generator.generate_embeddings(
         vocab.get_column("label_text").to_list(),
-        batch_size=batch_size,
-        task="retrieval.query",
-        use_tqdm=use_tqdm,
+        **(encode_args if encode_args is not None else {})
     )
 
     return vocab.with_columns(

@@ -101,37 +101,54 @@ class Duckdb_client:
 
         result_df = self.connection.execute("SELECT * FROM results").pl()
 
+        # Apply MinMax scaling to the 'score' column per 'id'
+        # and keep n_hits results
         result_df = (
             result_df.group_by("id")
             .agg(
-                doc_id=pl.col("doc_id").first(),
-                chunk_position=pl.col("chunk_position").first(),
-                n_chunks=pl.col("n_chunks").first(),
-                label_id=pl.col("label_id"),
-                is_prefLabel=pl.col("is_prefLabel"),
-                score=pl.col("score") / pl.col("score").max(),
+            doc_id=pl.col("doc_id").first(),
+            chunk_position=pl.col("chunk_position").first(),
+            n_chunks=pl.col("n_chunks").first(),
+            label_id=pl.col("label_id"),
+            is_prefLabel=pl.col("is_prefLabel"),
+            cosine_similarity=pl.col("score"),
+            max_score=pl.col("score").max(),
+            min_score=pl.col("score").min(),
+            score=pl.col("score"),
             )
-            .explode(["label_id", "is_prefLabel", "score"])
+            .explode(["label_id", "is_prefLabel", "cosine_similarity", "score"])
+            .with_columns([
+            (
+                (pl.col("score") - pl.col("min_score")) /
+                (pl.col("max_score") - pl.col("min_score") + 1e-9)
+            ).alias("score")
+            ])
+            .drop("min_score", "max_score")
+            .sort("score", descending=True)
+            .group_by("id")
+            .head(n_hits)
         )
-
+        # if a label is hit more then once due to altlabels
+        # keep only the best hit
         result_df = (
             result_df.sort("score", descending=True)
             .group_by(["id", "label_id", "doc_id"])
             .head(1)
         )
-
+        # across chunks (queries) aggregate statistics for
+        # each tupel doc_id, label_id
         result_df = result_df.group_by(["doc_id", "label_id"]).agg(
             score=pl.col("score").sum(),
             occurrences=pl.col("doc_id").count(),
-            min_cosine_similarity=pl.col("score").min(),
-            max_cosine_similarity=pl.col("score").max(),
+            min_cosine_similarity=pl.col("cosine_similarity").min(),
+            max_cosine_similarity=pl.col("cosine_similarity").max(),
             first_occurence=pl.col("chunk_position").min(),
             last_occurence=pl.col("chunk_position").max(),
             spread=(pl.col("chunk_position").max() - pl.col("chunk_position").min()),
             is_prefLabel=pl.col("is_prefLabel").first(),
             n_chunks=pl.col("n_chunks").first(),
         )
-
+        # keep only top_k suggestions per document
         result_df = (
             result_df.sort("score", descending=True).group_by("doc_id").head(top_k)
         )
@@ -144,7 +161,6 @@ class Duckdb_client:
                 (pl.col("last_occurence") / pl.col("n_chunks")),
                 (pl.col("spread") / pl.col("n_chunks")),
             )
-            .drop("n_chunks")
             .sort(["doc_id", "label_id"])
         )
 
@@ -171,6 +187,10 @@ class Duckdb_client:
             "INSERT INTO queries BY NAME SELECT * FROM queries_df"
         )
 
+        if limit < 100:
+            # apply oversearch to reduce sensitivity in MinMax scaling
+            limit = 100
+
         thread_connection.execute(
             f"""INSERT INTO results
             SELECT queries.query_id, 
@@ -179,13 +199,13 @@ class Duckdb_client:
             queries.n_chunks,
             label_id,
             is_prefLabel,
-            (1 - score) AS score,
+            (1 - intermed_score) AS score,
             FROM queries, LATERAL (
                 SELECT {collection_name}.label_id,
                 {collection_name}.is_prefLabel,
-                {hnsw_metric_function}(queries.embeddings, {collection_name}.embeddings) AS score
+                {hnsw_metric_function}(queries.embeddings, {collection_name}.embeddings) AS intermed_score
                 FROM {collection_name}
-                ORDER BY score
+                ORDER BY intermed_score
                 LIMIT {limit}
             )"""
         )

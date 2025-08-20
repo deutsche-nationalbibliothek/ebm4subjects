@@ -1,4 +1,6 @@
 from __future__ import annotations
+from concurrent.futures import ProcessPoolExecutor
+import pickle
 
 from pathlib import Path
 
@@ -11,6 +13,10 @@ from ebm4subjects.chunker import Chunker
 from ebm4subjects.duckdb_client import Duckdb_client
 from ebm4subjects.ebm_logging import EbmLogger, XGBLogging
 from ebm4subjects.embedding_generator import EmbeddingGenerator
+from tqdm import tqdm
+import numpy as np
+from math import ceil
+import warnings
 
 
 class EbmModel:
@@ -22,10 +28,10 @@ class EbmModel:
         use_altLabels: bool,
         embedding_model_name: str,
         embedding_dimensions: int,
-        embedding_batch_size: int,
         chunk_tokenizer: str,
         max_chunks: int,
         max_chunk_size: int,
+        chunking_jobs: int,
         max_sentences: int,
         max_query_hits: int,
         query_top_k: int,
@@ -35,13 +41,17 @@ class EbmModel:
         xgb_subsample: float,
         xgb_rounds: int,
         xgb_jobs: int,
+        model_args: dict = None,
+        encode_args_vocab: dict = None,
+        encode_args_documents: dict = None
     ) -> None:
-        self.client = Duckdb_client(
-            db_path=db_path,
-            config={"hnsw_enable_experimental_persistence": True, "threads": 42},
-        )
+        self.client = None
+        self.generator = None
         self.db_path = db_path
         self.collection_name = collection_name
+        self.embedding_model_name = embedding_model_name
+        self.embedding_dimensions = embedding_dimensions
+        self.model_args = model_args if model_args is not None else {}
 
         self.logger = None
         self.xgb_logger = None
@@ -57,12 +67,14 @@ class EbmModel:
             max_chunk_size=max_chunk_size,
             max_sentences=max_sentences,
         )
+        self.chunking_jobs = chunking_jobs
 
+        self.encode_args_vocab = encode_args_vocab
+        self.encode_args_documents = encode_args_documents
         self.use_altLabels = use_altLabels
 
         self.embedding_model_name = embedding_model_name
         self.embedding_dimensions = embedding_dimensions
-        self.embedding_batch_size = embedding_batch_size
 
         self.max_query_hits = max_query_hits
         self.query_top_k = query_top_k
@@ -75,6 +87,26 @@ class EbmModel:
         self.train_jobs = xgb_jobs
 
         self.model = None
+
+    def init_generator(self) -> None:
+        if self.logger:
+            self.logger.info("Initializing embedding generator")
+
+        self.generator = EmbeddingGenerator(
+            model_name=self.embedding_model_name,
+            embedding_dimensions=self.embedding_dimensions,
+            **self.model_args
+        )
+
+    def init_duckdb_client(self) -> None:
+        if self.logger:
+            self.logger.info("Initializing DuckDB client")
+
+        self.client = Duckdb_client(
+            db_path=self.db_path,
+            config={"hnsw_enable_experimental_persistence": True, "threads": 42}
+        )
+
 
     def create_vector_db(
         self,
@@ -93,9 +125,8 @@ class EbmModel:
             self.logger.info("Adding embeddings to vocabulary")
         collection_df = prepare_data.add_vocab_embeddings(
             vocab=vocab,
-            model_name=self.embedding_model_name,
-            embedding_dimensions=self.embedding_dimensions,
-            batch_size=self.embedding_batch_size,
+            generator=self.generator,
+            encode_args=self.encode_args_vocab
         )
 
         if vocab_out_path:
@@ -158,6 +189,7 @@ class EbmModel:
                 pl.col("suggested").fill_null(False),
                 pl.col("gold").fill_null(False),
             )
+            .filter(pl.col("suggested") == True)
         )
 
     def _read_long_document_format(
@@ -260,17 +292,25 @@ class EbmModel:
 
     def prepare_train(
         self,
-        train_texts: list[str],
-        train_doc_ids: list[str],
         gold_doc_ids: list[str],
         gold_label_ids: list[str],
+        train_texts: list[str] = None,
+        train_doc_ids: list[str] = None,
+        train_candidates: pl.DataFrame = None,
     ) -> pl.DataFrame:
+
         if self.logger:
             self.logger.info("Preparing training data.")
-        train_candidates = self._prepare_train_data(
-            texts=train_texts,
-            doc_ids=train_doc_ids,
-        )
+        if train_candidates is None:
+            if train_texts is None or train_doc_ids is None:
+                if self.logger:
+                    self.logger.error("Training texts or document IDs are missing.")
+                return
+            train_candidates = self._prepare_train_data(
+                texts=train_texts,
+                doc_ids=train_doc_ids
+            )
+
 
         if self.logger:
             self.logger.info("Preparing gold standard.")
@@ -299,6 +339,7 @@ class EbmModel:
                     "last_occurence",
                     "spread",
                     "is_prefLabel",
+                    "n_chunks",
                     "gold",
                 ]
             )
@@ -320,6 +361,7 @@ class EbmModel:
                     "last_occurence",
                     "spread",
                     "is_prefLabel",
+                    "n_chunks"
                 ]
             ).to_pandas(),
             train_data.to_pandas()["gold"],
@@ -359,10 +401,6 @@ class EbmModel:
         text: str,
         doc_id: int,
     ) -> pl.DataFrame:
-        embedding_generator = EmbeddingGenerator(
-            model_name=self.embedding_model_name,
-            embedding_dimensions=self.embedding_dimensions,
-        )
 
         if self.logger:
             self.logger.info("Chunking text")
@@ -370,10 +408,15 @@ class EbmModel:
 
         if self.logger:
             self.logger.info("Creating embeddings for text chunks")
-        embeddings = embedding_generator.generate_embeddings(
+
+        self.check_multi_device()
+
+        if self.generator is None:
+            self.init_generator()
+
+        embeddings = self.generator.generate_embeddings(
             texts=text_chunks,
-            batch_size=self.embedding_batch_size,
-            task="retrieval.passage",
+            **(self.encode_args_documents if self.encode_args_documents is not None else {})
         )
 
         if self.logger:
@@ -389,7 +432,11 @@ class EbmModel:
         )
 
         if self.logger:
-            self.logger.info("Running verctor search and creating candidates")
+            self.logger.info("Running vector search and creating candidates")
+
+        if self.client is None:
+            self.init_duckdb_client()
+
         candidates = self.client.vector_search(
             query_df=query_df,
             collection_name=self.collection_name,
@@ -407,44 +454,58 @@ class EbmModel:
         self,
         texts: list[str],
         doc_ids: list[int],
-    ):
-        embedding_generator = EmbeddingGenerator(
-            model_name=self.embedding_model_name,
-            embedding_dimensions=self.embedding_dimensions,
+        use_tqdm: bool = False
+    )  -> pl.DataFrame:
+
+        if self.logger:
+            self.logger.info("Chunking texts in batches")
+
+        text_chunks = []
+        chunk_index = []
+
+        num_batches = self.chunking_jobs
+        chunking_batch_size = ceil(len(texts) / num_batches)
+        batch_args = [
+            (doc_ids[i*chunking_batch_size:(i+1)*chunking_batch_size], texts[i*chunking_batch_size:(i+1)*chunking_batch_size], self.chunker)
+            for i in range(num_batches)
+        ]
+
+        # Use ProcessPoolExecutor for true parallelism
+        with ProcessPoolExecutor(max_workers=self.query_jobs) as executor:
+            results = list(executor.map(_chunk_batch, batch_args))
+
+        for batch_chunks, batch_chunk_indices in results:
+            text_chunks.extend(batch_chunks)
+            chunk_index.extend(batch_chunk_indices)
+
+        chunk_index = pl.concat(chunk_index).with_row_index("query_id")
+        self.logger.info("Creating embeddings for text chunks and query dataframe")
+
+        if self.generator is None:
+            self.init_generator()
+
+        embeddings = self.generator.generate_embeddings(
+            texts=text_chunks,
+            **(self.encode_args_documents if self.encode_args_documents is not None else {})
+        )
+        
+        # Extend chunk_index by a list column containing the embeddings
+        query_df = chunk_index.with_columns(
+            pl.Series("embeddings", embeddings)
         )
 
         if self.logger:
-            self.logger.info("Chunking texts")
-        text_chunks = []
-        for text in texts:
-            text_chunks.append(self.chunker.chunk_text(text))
-
-        if self.logger:
-            self.logger.info("Creating embeddings for text chunks and query dataframe")
-        query_dfs = []
-        id_count = 1
-        for doc_id, chunks in zip(doc_ids, text_chunks):
-            query_dfs.append(
-                pl.DataFrame(
-                    {
-                        "query_id": [i + id_count for i in range(len(chunks))],
-                        "query_doc_id": [doc_id for _ in range(len(chunks))],
-                        "chunk_position": [i + 1 for i in range(len(chunks))],
-                        "n_chunks": [len(chunks) for _ in range(len(chunks))],
-                        "embeddings": embedding_generator.generate_embeddings(
-                            texts=chunks,
-                            batch_size=self.embedding_batch_size,
-                            task="retrieval.passage",
-                        ),
-                    }
-                )
-            )
-            id_count += len(chunks)
-
-        query_df = pl.concat(query_dfs)
-
-        if self.logger:
             self.logger.info("Running verctor search and creating candidates")
+
+        # with multi-GPU processing in the generate embeddings process
+        # duckdb may throw an error due to its incompatible handling of
+        # multiple threads. Therefore late initialization of the client
+        # is required.
+        if self.client is None:
+            self.init_duckdb_client()
+        else:
+            self.check_multi_device()
+
         candidates = self.client.vector_search(
             query_df=query_df,
             collection_name=self.collection_name,
@@ -472,6 +533,7 @@ class EbmModel:
                     "last_occurence",
                     "spread",
                     "is_prefLabel",
+                    "n_chunks"
                 ]
             )
         )
@@ -499,13 +561,41 @@ class EbmModel:
             return
         else:
             self.client = None
+            self.generator = None
             joblib.dump(self, output_path)
 
     @staticmethod
-    def load(input_path: str) -> EbmModel:
+    def load(input_path: str, load_generator: bool = True) -> EbmModel:
         model = joblib.load(input_path)
-        model.client = Duckdb_client(
-            db_path=model.db_path,
-            config={"hnsw_enable_experimental_persistence": True, "threads": 42},
-        )
+        model.client = model.init_duckdb_client()
+        if load_generator:
+            model.generator = model.init_generator()
+
         return model
+
+    def check_multi_device(self):
+        if self.encode_args_documents is not None and "device" in self.encode_args_documents:
+            device_val = self.encode_args_documents["device"]
+            if isinstance(device_val, list) and len(device_val) > 1:
+                warnings.warn(
+                    "Multi-device (multi-GPU/CPU) processing may cause conflicts in "
+                    "generate_candidates or with duckdb multithreading if the database "
+                    "client is already initialized. Set enocding args to single device "
+                    "or use generate_candidates_batch"
+                )
+
+def _chunk_batch(args):
+    batch_doc_ids, batch_texts, chunker = args
+    batch_chunks = []
+    batch_chunk_indices = []
+    for doc_id, text in tqdm(zip(batch_doc_ids, batch_texts), total=len(batch_doc_ids), desc="Chunking batch"):
+        new_chunks = chunker.chunk_text(text)
+        n_chunks = len(new_chunks)
+        chunk_df = pl.DataFrame({
+            "query_doc_id": [doc_id]*n_chunks,
+            "chunk_position": list(range(n_chunks)),
+            "n_chunks": [n_chunks]*n_chunks
+        })
+        batch_chunks.extend(new_chunks)
+        batch_chunk_indices.append(chunk_df)
+    return batch_chunks, batch_chunk_indices

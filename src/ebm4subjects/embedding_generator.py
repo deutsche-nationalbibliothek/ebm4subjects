@@ -1,49 +1,30 @@
 import numpy as np
-import torch
-from transformers import AutoModel
-from tqdm import tqdm
+from sentence_transformers import SentenceTransformer
 
 
 class EmbeddingGenerator:
-    def __init__(self, model_name: str, embedding_dimensions: int) -> None:
+    def __init__(self, model_name: str, embedding_dimensions: int, **kwargs) -> None:
         self.model_name = model_name
         self.embedding_dimensions = embedding_dimensions
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        self.model = AutoModel.from_pretrained(model_name, trust_remote_code=True)
-        self.model = self.model.to(device)  # Move to device first
+        self.model = SentenceTransformer(
+            model_name, 
+            truncate_dim=embedding_dimensions,
+            **kwargs
+        )
 
-        if torch.cuda.device_count() > 1:
-            print(f"Using {torch.cuda.device_count()} GPUs for model inference.")
-            self.model = torch.nn.DataParallel(self.model)
-
-        self.model.eval()
 
     def generate_embeddings(
         self,
         texts: list[str],
-        batch_size: int = 1,
-        task: str = "text-matching",
-        use_tqdm: bool = False
+        **kwargs
     ) -> np.ndarray:
-        embeddings = []
+        if not texts:
+            return np.empty((0, self.embedding_dimensions))
+        
+        embeddings = self.model.encode(
+            texts,
+            **kwargs
+        )
 
-        with torch.no_grad():
-            iterator = range(0, len(texts), batch_size)
-            if use_tqdm:
-                iterator = tqdm(iterator, desc="Generating embeddings")
-            for i in iterator:
-                embeddings.append(
-                    self.model.module.encode(
-                        texts[i : i + batch_size],
-                        truncate_dim=self.embedding_dimensions,
-                        task=task,
-                    ) if isinstance(self.model, torch.nn.DataParallel) else
-                    self.model.encode(
-                        texts[i : i + batch_size],
-                        truncate_dim=self.embedding_dimensions,
-                        task=task,
-                    )
-                )
-
-        return np.concatenate(embeddings)
+        return embeddings
