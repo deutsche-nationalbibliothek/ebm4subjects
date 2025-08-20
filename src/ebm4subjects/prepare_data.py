@@ -37,14 +37,11 @@ def parse_vocab(vocab_path: str, use_altLabels: bool = True) -> pl.DataFrame:
 
 
 def add_vocab_embeddings(
-    vocab: pl.DataFrame,
-    generator: EmbeddingGenerator,
-    encode_args: dict = None
+    vocab: pl.DataFrame, generator: EmbeddingGenerator, encode_args: dict = None
 ):
-
     embeddings = generator.generate_embeddings(
         vocab.get_column("label_text").to_list(),
-        **(encode_args if encode_args is not None else {})
+        **(encode_args if encode_args is not None else {}),
     )
 
     return vocab.with_columns(

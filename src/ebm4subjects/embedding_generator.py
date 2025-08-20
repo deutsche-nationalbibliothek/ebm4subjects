@@ -8,23 +8,13 @@ class EmbeddingGenerator:
         self.embedding_dimensions = embedding_dimensions
 
         self.model = SentenceTransformer(
-            model_name, 
-            truncate_dim=embedding_dimensions,
-            **kwargs
+            model_name, truncate_dim=embedding_dimensions, **kwargs
         )
 
-
-    def generate_embeddings(
-        self,
-        texts: list[str],
-        **kwargs
-    ) -> np.ndarray:
+    def generate_embeddings(self, texts: list[str], **kwargs) -> np.ndarray:
         if not texts:
             return np.empty((0, self.embedding_dimensions))
-        
-        embeddings = self.model.encode(
-            texts,
-            **kwargs
-        )
+
+        embeddings = self.model.encode(texts, **kwargs)
 
         return embeddings

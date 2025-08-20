@@ -108,23 +108,25 @@ class Duckdb_client:
         result_df = (
             result_df.group_by("id")
             .agg(
-            doc_id=pl.col("doc_id").first(),
-            chunk_position=pl.col("chunk_position").first(),
-            n_chunks=pl.col("n_chunks").first(),
-            label_id=pl.col("label_id"),
-            is_prefLabel=pl.col("is_prefLabel"),
-            cosine_similarity=pl.col("score"),
-            max_score=pl.col("score").max(),
-            min_score=pl.col("score").min(),
-            score=pl.col("score"),
+                doc_id=pl.col("doc_id").first(),
+                chunk_position=pl.col("chunk_position").first(),
+                n_chunks=pl.col("n_chunks").first(),
+                label_id=pl.col("label_id"),
+                is_prefLabel=pl.col("is_prefLabel"),
+                cosine_similarity=pl.col("score"),
+                max_score=pl.col("score").max(),
+                min_score=pl.col("score").min(),
+                score=pl.col("score"),
             )
             .explode(["label_id", "is_prefLabel", "cosine_similarity", "score"])
-            .with_columns([
-            (
-                (pl.col("score") - pl.col("min_score")) /
-                (pl.col("max_score") - pl.col("min_score") + 1e-9)
-            ).alias("score")
-            ])
+            .with_columns(
+                [
+                    (
+                        (pl.col("score") - pl.col("min_score"))
+                        / (pl.col("max_score") - pl.col("min_score") + 1e-9)
+                    ).alias("score")
+                ]
+            )
             .drop("min_score", "max_score")
             .sort("score", descending=True)
             .group_by("id")
@@ -155,16 +157,13 @@ class Duckdb_client:
             result_df.sort("score", descending=True).group_by("doc_id").head(top_k)
         )
 
-        return (
-            result_df.with_columns(
-                (pl.col("score") / pl.col("n_chunks")),
-                (pl.col("occurrences") / pl.col("n_chunks")),
-                (pl.col("first_occurence") / pl.col("n_chunks")),
-                (pl.col("last_occurence") / pl.col("n_chunks")),
-                (pl.col("spread") / pl.col("n_chunks")),
-            )
-            .sort(["doc_id", "label_id"])
-        )
+        return result_df.with_columns(
+            (pl.col("score") / pl.col("n_chunks")),
+            (pl.col("occurrences") / pl.col("n_chunks")),
+            (pl.col("first_occurence") / pl.col("n_chunks")),
+            (pl.col("last_occurence") / pl.col("n_chunks")),
+            (pl.col("spread") / pl.col("n_chunks")),
+        ).sort(["doc_id", "label_id"])
 
     def _vss_thread_query(
         self,

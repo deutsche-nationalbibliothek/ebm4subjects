@@ -1,22 +1,20 @@
 from __future__ import annotations
-from concurrent.futures import ProcessPoolExecutor
-import pickle
 
+import warnings
+from concurrent.futures import ProcessPoolExecutor
+from math import ceil
 from pathlib import Path
 
 import joblib
 import polars as pl
 import xgboost as xgb
+from tqdm import tqdm
 
 from ebm4subjects import prepare_data
 from ebm4subjects.chunker import Chunker
 from ebm4subjects.duckdb_client import Duckdb_client
 from ebm4subjects.ebm_logging import EbmLogger, XGBLogging
 from ebm4subjects.embedding_generator import EmbeddingGenerator
-from tqdm import tqdm
-import numpy as np
-from math import ceil
-import warnings
 
 
 class EbmModel:
@@ -44,7 +42,7 @@ class EbmModel:
         xgb_jobs: int,
         model_args: dict = None,
         encode_args_vocab: dict = None,
-        encode_args_documents: dict = None
+        encode_args_documents: dict = None,
     ) -> None:
         self.client = None
         self.generator = None
@@ -97,7 +95,7 @@ class EbmModel:
         self.generator = EmbeddingGenerator(
             model_name=self.embedding_model_name,
             embedding_dimensions=self.embedding_dimensions,
-            **self.model_args
+            **self.model_args,
         )
 
     def init_duckdb_client(self) -> None:
@@ -107,9 +105,8 @@ class EbmModel:
         self.client = Duckdb_client(
             db_path=self.db_path,
             config={"hnsw_enable_experimental_persistence": True, "threads": 42},
-            hnsw_index_params=self.hnsw_index_params
+            hnsw_index_params=self.hnsw_index_params,
         )
-
 
     def create_vector_db(
         self,
@@ -127,9 +124,7 @@ class EbmModel:
         if self.logger:
             self.logger.info("Adding embeddings to vocabulary")
         collection_df = prepare_data.add_vocab_embeddings(
-            vocab=vocab,
-            generator=self.generator,
-            encode_args=self.encode_args_vocab
+            vocab=vocab, generator=self.generator, encode_args=self.encode_args_vocab
         )
 
         if vocab_out_path:
@@ -192,7 +187,7 @@ class EbmModel:
                 pl.col("suggested").fill_null(False),
                 pl.col("gold").fill_null(False),
             )
-            .filter(pl.col("suggested") == True)
+            .filter(pl.col("suggested"))
         )
 
     def _read_long_document_format(
@@ -301,7 +296,6 @@ class EbmModel:
         train_doc_ids: list[str] = None,
         train_candidates: pl.DataFrame = None,
     ) -> pl.DataFrame:
-
         if self.logger:
             self.logger.info("Preparing training data.")
         if train_candidates is None:
@@ -310,10 +304,8 @@ class EbmModel:
                     self.logger.error("Training texts or document IDs are missing.")
                 return
             train_candidates = self._prepare_train_data(
-                texts=train_texts,
-                doc_ids=train_doc_ids
+                texts=train_texts, doc_ids=train_doc_ids
             )
-
 
         if self.logger:
             self.logger.info("Preparing gold standard.")
@@ -364,7 +356,7 @@ class EbmModel:
                     "last_occurence",
                     "spread",
                     "is_prefLabel",
-                    "n_chunks"
+                    "n_chunks",
                 ]
             ).to_pandas(),
             train_data.to_pandas()["gold"],
@@ -404,7 +396,6 @@ class EbmModel:
         text: str,
         doc_id: int,
     ) -> pl.DataFrame:
-
         if self.logger:
             self.logger.info("Chunking text")
         text_chunks = self.chunker.chunk_text(text)
@@ -419,7 +410,11 @@ class EbmModel:
 
         embeddings = self.generator.generate_embeddings(
             texts=text_chunks,
-            **(self.encode_args_documents if self.encode_args_documents is not None else {})
+            **(
+                self.encode_args_documents
+                if self.encode_args_documents is not None
+                else {}
+            ),
         )
 
         if self.logger:
@@ -448,18 +443,14 @@ class EbmModel:
             n_hits=self.max_query_hits,
             chunk_size=1024,
             top_k=self.query_top_k,
-            hnsw_metric_function="array_cosine_distance"
+            hnsw_metric_function="array_cosine_distance",
         )
 
         return candidates
 
     def generate_candidates_batch(
-        self,
-        texts: list[str],
-        doc_ids: list[int],
-        use_tqdm: bool = False
-    )  -> pl.DataFrame:
-
+        self, texts: list[str], doc_ids: list[int], use_tqdm: bool = False
+    ) -> pl.DataFrame:
         if self.logger:
             self.logger.info("Chunking texts in batches")
 
@@ -469,7 +460,11 @@ class EbmModel:
         num_batches = self.chunking_jobs
         chunking_batch_size = ceil(len(texts) / num_batches)
         batch_args = [
-            (doc_ids[i*chunking_batch_size:(i+1)*chunking_batch_size], texts[i*chunking_batch_size:(i+1)*chunking_batch_size], self.chunker)
+            (
+                doc_ids[i * chunking_batch_size : (i + 1) * chunking_batch_size],
+                texts[i * chunking_batch_size : (i + 1) * chunking_batch_size],
+                self.chunker,
+            )
             for i in range(num_batches)
         ]
 
@@ -489,13 +484,15 @@ class EbmModel:
 
         embeddings = self.generator.generate_embeddings(
             texts=text_chunks,
-            **(self.encode_args_documents if self.encode_args_documents is not None else {})
+            **(
+                self.encode_args_documents
+                if self.encode_args_documents is not None
+                else {}
+            ),
         )
-        
+
         # Extend chunk_index by a list column containing the embeddings
-        query_df = chunk_index.with_columns(
-            pl.Series("embeddings", embeddings)
-        )
+        query_df = chunk_index.with_columns(pl.Series("embeddings", embeddings))
 
         if self.logger:
             self.logger.info("Running verctor search and creating candidates")
@@ -517,7 +514,7 @@ class EbmModel:
             n_hits=self.max_query_hits,
             chunk_size=1024,
             top_k=self.query_top_k,
-            hnsw_metric_function="array_cosine_distance"
+            hnsw_metric_function="array_cosine_distance",
         )
 
         return candidates
@@ -536,7 +533,7 @@ class EbmModel:
                     "last_occurence",
                     "spread",
                     "is_prefLabel",
-                    "n_chunks"
+                    "n_chunks",
                 ]
             )
         )
@@ -577,7 +574,10 @@ class EbmModel:
         return model
 
     def check_multi_device(self):
-        if self.encode_args_documents is not None and "device" in self.encode_args_documents:
+        if (
+            self.encode_args_documents is not None
+            and "device" in self.encode_args_documents
+        ):
             device_val = self.encode_args_documents["device"]
             if isinstance(device_val, list) and len(device_val) > 1:
                 warnings.warn(
@@ -587,18 +587,23 @@ class EbmModel:
                     "or use generate_candidates_batch"
                 )
 
+
 def _chunk_batch(args):
     batch_doc_ids, batch_texts, chunker = args
     batch_chunks = []
     batch_chunk_indices = []
-    for doc_id, text in tqdm(zip(batch_doc_ids, batch_texts), total=len(batch_doc_ids), desc="Chunking batch"):
+    for doc_id, text in tqdm(
+        zip(batch_doc_ids, batch_texts), total=len(batch_doc_ids), desc="Chunking batch"
+    ):
         new_chunks = chunker.chunk_text(text)
         n_chunks = len(new_chunks)
-        chunk_df = pl.DataFrame({
-            "query_doc_id": [doc_id]*n_chunks,
-            "chunk_position": list(range(n_chunks)),
-            "n_chunks": [n_chunks]*n_chunks
-        })
+        chunk_df = pl.DataFrame(
+            {
+                "query_doc_id": [doc_id] * n_chunks,
+                "chunk_position": list(range(n_chunks)),
+                "n_chunks": [n_chunks] * n_chunks,
+            }
+        )
         batch_chunks.extend(new_chunks)
         batch_chunk_indices.append(chunk_df)
     return batch_chunks, batch_chunk_indices
