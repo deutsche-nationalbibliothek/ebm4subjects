@@ -61,16 +61,11 @@ class Duckdb_client:
         collection_name: str,
         embedding_dimensions: int,
         n_jobs: int = 1,
-        n_hits: int = 10,
+        n_hits: int = 100,
         chunk_size: int = 2048,
         top_k: int = 10,
         hnsw_metric_function: str = "array_cosine_distance",
     ) -> pl.DataFrame:
-        query_dfs = [
-            query_df.slice(i, chunk_size) for i in range(0, query_df.height, chunk_size)
-        ]
-        batches = [query_dfs[i : i + n_jobs] for i in range(0, len(query_dfs), n_jobs)]
-
         self.connection.execute("""CREATE OR REPLACE TABLE results ( 
                                 id INTEGER,
                                 doc_id VARCHAR,
@@ -79,6 +74,11 @@ class Duckdb_client:
                                 label_id VARCHAR,
                                 is_prefLabel BOOLEAN,
                                 score FLOAT)""")
+
+        query_dfs = [
+            query_df.slice(i, chunk_size) for i in range(0, query_df.height, chunk_size)
+        ]
+        batches = [query_dfs[i : i + n_jobs] for i in range(0, len(query_dfs), n_jobs)]
 
         for batch in batches:
             threads = []
@@ -132,6 +132,7 @@ class Duckdb_client:
             .group_by("id")
             .head(n_hits)
         )
+
         # if a label is hit more then once due to altlabels
         # keep only the best hit
         result_df = (
@@ -139,6 +140,7 @@ class Duckdb_client:
             .group_by(["id", "label_id", "doc_id"])
             .head(1)
         )
+
         # across chunks (queries) aggregate statistics for
         # each tupel doc_id, label_id
         result_df = result_df.group_by(["doc_id", "label_id"]).agg(
@@ -152,6 +154,7 @@ class Duckdb_client:
             is_prefLabel=pl.col("is_prefLabel").first(),
             n_chunks=pl.col("n_chunks").first(),
         )
+
         # keep only top_k suggestions per document
         result_df = (
             result_df.sort("score", descending=True).group_by("doc_id").head(top_k)
@@ -171,7 +174,7 @@ class Duckdb_client:
         collection_name: str,
         vector_dimensions: int,
         hnsw_metric_function: str = "array_cosine_distance",
-        limit: int = 10,
+        limit: int = 100,
     ):
         thread_connection = self.connection.cursor()
 
@@ -188,8 +191,8 @@ class Duckdb_client:
             "INSERT INTO queries BY NAME SELECT * FROM queries_df"
         )
 
+        # apply oversearch to reduce sensitivity in MinMax scaling
         if limit < 100:
-            # apply oversearch to reduce sensitivity in MinMax scaling
             limit = 100
 
         thread_connection.execute(

@@ -136,7 +136,7 @@ class EbmModel:
         if vocab_out_path and Path(vocab_out_path).exists():
             if self.logger:
                 self.logger.info(
-                    f"Loading vocabulary with embeddings from {vocab_out_path}."
+                    f"Loading vocabulary with embeddings from {vocab_out_path}"
                 )
             collection_df = pl.read_ipc(vocab_out_path)
         else:
@@ -161,7 +161,7 @@ class EbmModel:
                 if Path(vocab_out_path).exists() and not force:
                     if self.logger:
                         self.logger.warn(
-                            f"Cant't save vocabulary to {vocab_out_path}. File already exists."
+                            f"Cant't save vocabulary to {vocab_out_path}. File already exists"
                         )
                 else:
                     if self.logger:
@@ -181,11 +181,61 @@ class EbmModel:
             force=force,
         )
 
-    def _prepare_train_data(
+    def prepare_train(
         self,
-        texts: list[str],
-        doc_ids: list[int],
+        gold_doc_ids: list[str],
+        gold_label_ids: list[str],
+        train_texts: list[str] = None,
+        train_doc_ids: list[str] = None,
+        train_candidates: pl.DataFrame = None,
     ) -> pl.DataFrame:
+        if self.logger:
+            self.logger.info("Preparing training data")
+        if train_candidates is None:
+            if train_texts is None or train_doc_ids is None:
+                if self.logger:
+                    self.logger.error("Training texts or document IDs are missing")
+                return
+            train_candidates = self._prepare_train_data(
+                texts=train_texts, doc_ids=train_doc_ids
+            )
+
+        if self.logger:
+            self.logger.info("Preparing gold standard")
+        gold_standard = pl.DataFrame(
+            {
+                "doc_id": gold_doc_ids,
+                "label_id": gold_label_ids,
+            }
+        ).with_columns(
+            pl.col("doc_id").cast(pl.String), pl.col("label_id").cast(pl.String)
+        )
+
+        if self.logger:
+            self.logger.info("Prepare training data and gold standard for training")
+        training_data = (
+            self._compare_to_gold_standard(train_candidates, gold_standard)
+            .with_columns(pl.when(pl.col("gold")).then(1).otherwise(0).alias("gold"))
+            .filter(pl.col("doc_id").is_not_null())
+            .select(
+                [
+                    "score",
+                    "occurrences",
+                    "min_cosine_similarity",
+                    "max_cosine_similarity",
+                    "first_occurence",
+                    "last_occurence",
+                    "spread",
+                    "is_prefLabel",
+                    "n_chunks",
+                    "gold",
+                ]
+            )
+        )
+
+        return training_data
+
+    def _prepare_train_data(self, texts: list[str], doc_ids: list[int]) -> pl.DataFrame:
         candidates_dfs = []
 
         for text, doc_id in zip(texts, doc_ids):
@@ -217,207 +267,6 @@ class EbmModel:
             .filter(pl.col("suggested"))
         )
 
-    def _read_long_document_format(
-        self,
-        path_to_document_file: str,
-        path_to_index_file: str,
-    ) -> pl.DataFrame:
-        documents = (
-            pl.read_csv(
-                path_to_document_file,
-                has_header=False,
-                separator="\t",
-                schema={"text": pl.String, "label_id": pl.String},
-            )
-            .with_row_index()
-            .with_columns(pl.col("label_id").str.split(" "))
-            .explode("label_id")
-        )
-
-        index = pl.read_ipc(path_to_index_file)
-
-        return documents.join(
-            other=index,
-            left_on="index",
-            right_on="location",
-            how="inner",
-        ).select(["text", "label_id", "idn"])
-
-    def prepare_train_from_docs(
-        self,
-        path_to_document_file: str,
-        path_to_index_file: str,
-    ) -> pl.DataFrame:
-        try:
-            documents = self._read_long_document_format(
-                path_to_document_file,
-                path_to_index_file,
-            )
-        except FileNotFoundError:
-            if self.logger:
-                self.logger.error("Cant't load data. Files do not exist.")
-            return
-        except PermissionError:
-            if self.logger:
-                self.logger.error("Cant't load data. No permission to read files.")
-            return
-
-        if self.logger:
-            self.logger.info(
-                "Extracting training data and gold standard from documents"
-            )
-        train_texts = documents.get_column("text").to_list()
-        train_doc_ids = documents.get_column("idn").to_list()
-        gold_label_ids = [
-            label_id.split("/")[4][:-1]
-            for label_id in documents.get_column("label_id").to_list()
-        ]
-        gold_doc_ids = documents.get_column("idn").to_list()
-
-        if self.logger:
-            self.logger.info("Preparing training data.")
-        train_candidates = self._prepare_train_data(
-            texts=train_texts,
-            doc_ids=train_doc_ids,
-        )
-
-        if self.logger:
-            self.logger.info("Preparing gold standard.")
-        gold_standard = pl.DataFrame(
-            {
-                "doc_id": gold_doc_ids,
-                "label_id": gold_label_ids,
-            },
-        ).with_columns(
-            pl.col("doc_id").cast(pl.String), pl.col("label_id").cast(pl.String)
-        )
-
-        if self.logger:
-            self.logger.info("Prepare training data and gold standard for training")
-        training_data = (
-            self._compare_to_gold_standard(train_candidates, gold_standard)
-            .with_columns(pl.when(pl.col("gold")).then(1).otherwise(0).alias("gold"))
-            .filter(pl.col("doc_id").is_not_null())
-            .select(
-                [
-                    "score",
-                    "occurrences",
-                    "min_cosine_similarity",
-                    "max_cosine_similarity",
-                    "first_occurence",
-                    "last_occurence",
-                    "spread",
-                    "is_prefLabel",
-                    "gold",
-                ]
-            )
-        )
-
-        return training_data
-
-    def prepare_train(
-        self,
-        gold_doc_ids: list[str],
-        gold_label_ids: list[str],
-        train_texts: list[str] = None,
-        train_doc_ids: list[str] = None,
-        train_candidates: pl.DataFrame = None,
-    ) -> pl.DataFrame:
-        if self.logger:
-            self.logger.info("Preparing training data.")
-        if train_candidates is None:
-            if train_texts is None or train_doc_ids is None:
-                if self.logger:
-                    self.logger.error("Training texts or document IDs are missing.")
-                return
-            train_candidates = self._prepare_train_data(
-                texts=train_texts, doc_ids=train_doc_ids
-            )
-
-        if self.logger:
-            self.logger.info("Preparing gold standard.")
-        gold_standard = pl.DataFrame(
-            {
-                "doc_id": gold_doc_ids,
-                "label_id": gold_label_ids,
-            }
-        ).with_columns(
-            pl.col("doc_id").cast(pl.String), pl.col("label_id").cast(pl.String)
-        )
-
-        if self.logger:
-            self.logger.info("Prepare training data and gold standard for training.")
-        training_data = (
-            self._compare_to_gold_standard(train_candidates, gold_standard)
-            .with_columns(pl.when(pl.col("gold")).then(1).otherwise(0).alias("gold"))
-            .filter(pl.col("doc_id").is_not_null())
-            .select(
-                [
-                    "score",
-                    "occurrences",
-                    "min_cosine_similarity",
-                    "max_cosine_similarity",
-                    "first_occurence",
-                    "last_occurence",
-                    "spread",
-                    "is_prefLabel",
-                    "n_chunks",
-                    "gold",
-                ]
-            )
-        )
-
-        return training_data
-
-    def train(self, train_data: pl.DataFrame) -> None:
-        if self.logger:
-            self.logger.info("Creating training matrix")
-        matrix = xgb.DMatrix(
-            train_data.select(
-                [
-                    "score",
-                    "occurrences",
-                    "min_cosine_similarity",
-                    "max_cosine_similarity",
-                    "first_occurence",
-                    "last_occurence",
-                    "spread",
-                    "is_prefLabel",
-                    "n_chunks",
-                ]
-            ).to_pandas(),
-            train_data.to_pandas()["gold"],
-        )
-
-        try:
-            if self.logger:
-                self.logger.info("Starting training of XGBoost Ranker")
-            model = xgb.train(
-                params={
-                    "objective": "binary:logistic",
-                    "eval_metric": "logloss",
-                    "eta": self.train_shrinkage,
-                    "max_depth": self.train_interaction_depth,
-                    "subsample": self.train_subsample,
-                    "nthread": self.train_jobs,
-                },
-                dtrain=matrix,
-                verbose_eval=False,
-                evals=[(matrix, "train")],
-                num_boost_round=self.train_rounds,
-                callbacks=self.xgb_callbacks,
-            )
-            if self.logger:
-                self.logger.info("Training successful finished")
-        except xgb.core.XGBoostError:
-            if self.logger:
-                self.logger.critical(
-                    """XGBoost can't train with candidates equal to gold standard or candidates with no match to gold standard at all. Please check if your training data and gold standard are correct."""
-                )
-            return
-
-        self.model = model
-
     def generate_candidates(
         self,
         text: str,
@@ -427,14 +276,12 @@ class EbmModel:
             self.logger.info("Chunking text")
         text_chunks = self.chunker.chunk_text(text)
 
+        self._check_multi_device()
+
         if self.logger:
             self.logger.info("Creating embeddings for text chunks")
-
-        self.check_multi_device()
-
         if self.generator is None:
             self._init_generator()
-
         embeddings = self.generator.generate_embeddings(
             texts=text_chunks,
             **(
@@ -458,10 +305,8 @@ class EbmModel:
 
         if self.logger:
             self.logger.info("Running vector search and creating candidates")
-
         if self.client is None:
             self._init_duckdb_client()
-
         candidates = self.client.vector_search(
             query_df=query_df,
             collection_name=self.collection_name,
@@ -531,7 +376,7 @@ class EbmModel:
         if self.client is None:
             self._init_duckdb_client()
         else:
-            self.check_multi_device()
+            self._check_multi_device()
 
         candidates = self.client.vector_search(
             query_df=query_df,
@@ -545,6 +390,71 @@ class EbmModel:
         )
 
         return candidates
+    
+    def _check_multi_device(self):
+        if (
+            self.encode_args_documents is not None
+            and "device" in self.encode_args_documents
+        ):
+            device_val = self.encode_args_documents["device"]
+            if isinstance(device_val, list) and len(device_val) > 1:
+                warnings.warn(
+                    "Multi-device (multi-GPU/CPU) processing may cause conflicts in "
+                    "generate_candidates or with duckdb multithreading if the database "
+                    "client is already initialized. Set enocding args to single device "
+                    "or use generate_candidates_batch"
+                )
+
+    def train(self, train_data: pl.DataFrame) -> None:
+        if self.logger:
+            self.logger.info("Creating training matrix")
+        matrix = xgb.DMatrix(
+            train_data.select(
+                [
+                    "score",
+                    "occurrences",
+                    "min_cosine_similarity",
+                    "max_cosine_similarity",
+                    "first_occurence",
+                    "last_occurence",
+                    "spread",
+                    "is_prefLabel",
+                    "n_chunks",
+                ]
+            ).to_pandas(),
+            train_data.to_pandas()["gold"],
+        )
+
+        try:
+            if self.logger:
+                self.logger.info("Starting training of XGBoost Ranker")
+            model = xgb.train(
+                params={
+                    "objective": "binary:logistic",
+                    "eval_metric": "logloss",
+                    "eta": self.train_shrinkage,
+                    "max_depth": self.train_interaction_depth,
+                    "subsample": self.train_subsample,
+                    "nthread": self.train_jobs,
+                },
+                dtrain=matrix,
+                verbose_eval=False,
+                evals=[(matrix, "train")],
+                num_boost_round=self.train_rounds,
+                callbacks=self.xgb_callbacks,
+            )
+            if self.logger:
+                self.logger.info("Training successful finished")
+        except xgb.core.XGBoostError:
+            if self.logger:
+                self.logger.critical(
+                    "XGBoost can't train with candidates equal to gold standard "
+                    "or candidates with no match to gold standard at all - "
+                    "Check if your training data and gold standard are correct"
+                )
+            return
+
+        self.model = model
 
     def predict(self, candidates: pl.DataFrame) -> list[pl.DataFrame]:
         if self.logger:
@@ -579,20 +489,6 @@ class EbmModel:
             .partition_by("doc_id")
         )
 
-    def check_multi_device(self):
-        if (
-            self.encode_args_documents is not None
-            and "device" in self.encode_args_documents
-        ):
-            device_val = self.encode_args_documents["device"]
-            if isinstance(device_val, list) and len(device_val) > 1:
-                warnings.warn(
-                    "Multi-device (multi-GPU/CPU) processing may cause conflicts in "
-                    "generate_candidates or with duckdb multithreading if the database "
-                    "client is already initialized. Set enocding args to single device "
-                    "or use generate_candidates_batch"
-                )
-
     def _chunk_batch(args):
         batch_doc_ids, batch_texts, chunker = args
         batch_chunks = []
@@ -619,7 +515,7 @@ class EbmModel:
         if Path(output_path).exists() and not force:
             if self.logger:
                 self.logger.warn(
-                    f"Cant't save model to {output_path}. Model already exists. Try force=True to overwrite model file."
+                    f"Cant't save model to {output_path}. Model already exists. Try force=True to overwrite model file"
                 )
             return
         else:
