@@ -1,4 +1,10 @@
+import os
+from concurrent.futures import ProcessPoolExecutor
+from math import ceil
+from typing import Tuple
+
 import nltk
+import polars as pl
 
 
 class Chunker:
@@ -14,6 +20,8 @@ class Chunker:
         self.max_sentences = max_sentences if max_sentences else float("inf")
 
         self.tokenizer = nltk.data.load(tokenizer)
+
+        os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
     def chunk_text(self, text: str) -> list[str]:
         chunks = []
@@ -34,3 +42,48 @@ class Chunker:
             chunks.append(" ".join(current_chunk))
 
         return chunks
+
+    def chunk_batches(
+        self, texts: list[str], doc_ids: list[str], chunking_jobs: int, query_jobs: int
+    ) -> Tuple[list[str], list[str]]:
+        text_chunks = []
+        chunk_index = []
+
+        num_batches = chunking_jobs
+        chunking_batch_size = ceil(len(texts) / num_batches)
+        batch_args = [
+            (
+                doc_ids[i * chunking_batch_size : (i + 1) * chunking_batch_size],
+                texts[i * chunking_batch_size : (i + 1) * chunking_batch_size],
+            )
+            for i in range(num_batches)
+        ]
+
+        # Use ProcessPoolExecutor for true parallelism
+        with ProcessPoolExecutor(max_workers=query_jobs) as executor:
+            results = list(executor.map(self._chunk_batch, batch_args))
+
+        for batch_chunks, batch_chunk_indices in results:
+            text_chunks.extend(batch_chunks)
+            chunk_index.extend(batch_chunk_indices)
+
+        return text_chunks, chunk_index
+
+    def _chunk_batch(self, args):
+        batch_doc_ids, batch_texts = args
+
+        batch_chunks = []
+        batch_chunk_indices = []
+        for doc_id, text in zip(batch_doc_ids, batch_texts):
+            new_chunks = self.chunk_text(text)
+            n_chunks = len(new_chunks)
+            chunk_df = pl.DataFrame(
+                {
+                    "query_doc_id": [doc_id] * n_chunks,
+                    "chunk_position": list(range(n_chunks)),
+                    "n_chunks": [n_chunks] * n_chunks,
+                }
+            )
+            batch_chunks.extend(new_chunks)
+            batch_chunk_indices.append(chunk_df)
+        return batch_chunks, batch_chunk_indices

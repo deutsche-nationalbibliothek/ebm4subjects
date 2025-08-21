@@ -1,14 +1,11 @@
 from __future__ import annotations
 
 import warnings
-from concurrent.futures import ProcessPoolExecutor
-from math import ceil
 from pathlib import Path
 
 import joblib
 import polars as pl
 import xgboost as xgb
-from tqdm import tqdm
 
 from ebm4subjects import prepare_data
 from ebm4subjects.chunker import Chunker
@@ -149,8 +146,7 @@ class EbmModel:
 
             if self.logger:
                 self.logger.info("Adding embeddings to vocabulary")
-            if self.generator is None:
-                self._init_generator()
+            self._init_generator()
             collection_df = prepare_data.add_vocab_embeddings(
                 vocab=vocab,
                 generator=self.generator,
@@ -168,8 +164,7 @@ class EbmModel:
                         self.logger.info(f"Saving vocabulary to {vocab_out_path}")
                     collection_df.write_ipc(vocab_out_path)
 
-        if self.client is None:
-            self._init_duckdb_client()
+        self._init_duckdb_client()
         if self.logger:
             self.logger.info("Creating collection")
         self.client.create_collection(
@@ -272,16 +267,14 @@ class EbmModel:
         text: str,
         doc_id: int,
     ) -> pl.DataFrame:
+        self._check_multi_device()
+
         if self.logger:
             self.logger.info("Chunking text")
         text_chunks = self.chunker.chunk_text(text)
 
-        self._check_multi_device()
-
         if self.logger:
             self.logger.info("Creating embeddings for text chunks")
-        if self.generator is None:
-            self._init_generator()
         embeddings = self.generator.generate_embeddings(
             texts=text_chunks,
             **(
@@ -305,8 +298,6 @@ class EbmModel:
 
         if self.logger:
             self.logger.info("Running vector search and creating candidates")
-        if self.client is None:
-            self._init_duckdb_client()
         candidates = self.client.vector_search(
             query_df=query_df,
             collection_name=self.collection_name,
@@ -321,38 +312,19 @@ class EbmModel:
         return candidates
 
     def generate_candidates_batch(
-        self, texts: list[str], doc_ids: list[int], use_tqdm: bool = False
+        self, texts: list[str], doc_ids: list[int]
     ) -> pl.DataFrame:
+        self._check_multi_device()
+        
         if self.logger:
             self.logger.info("Chunking texts in batches")
-
-        text_chunks = []
-        chunk_index = []
-
-        num_batches = self.chunking_jobs
-        chunking_batch_size = ceil(len(texts) / num_batches)
-        batch_args = [
-            (
-                doc_ids[i * chunking_batch_size : (i + 1) * chunking_batch_size],
-                texts[i * chunking_batch_size : (i + 1) * chunking_batch_size],
-                self.chunker,
-            )
-            for i in range(num_batches)
-        ]
-
-        # Use ProcessPoolExecutor for true parallelism
-        with ProcessPoolExecutor(max_workers=self.query_jobs) as executor:
-            results = list(executor.map(self._chunk_batch, batch_args))
-
-        for batch_chunks, batch_chunk_indices in results:
-            text_chunks.extend(batch_chunks)
-            chunk_index.extend(batch_chunk_indices)
+        text_chunks, chunk_index = self.chunker.chunk_batches(
+            texts, doc_ids, self.chunking_jobs, self.query_jobs
+        )
 
         chunk_index = pl.concat(chunk_index).with_row_index("query_id")
-        self.logger.info("Creating embeddings for text chunks and query dataframe")
-
-        if self.generator is None:
-            self._init_generator()
+        if self.logger:
+            self.logger.info("Creating embeddings for text chunks and query dataframe")
 
         embeddings = self.generator.generate_embeddings(
             texts=text_chunks,
@@ -367,16 +339,13 @@ class EbmModel:
         query_df = chunk_index.with_columns(pl.Series("embeddings", embeddings))
 
         if self.logger:
-            self.logger.info("Running verctor search and creating candidates")
+            self.logger.info("Running vector search and creating candidates")
 
         # with multi-GPU processing in the generate embeddings process
         # duckdb may throw an error due to its incompatible handling of
         # multiple threads. Therefore late initialization of the client
         # is required.
-        if self.client is None:
-            self._init_duckdb_client()
-        else:
-            self._check_multi_device()
+        # self._init_duckdb_client()
 
         candidates = self.client.vector_search(
             query_df=query_df,
@@ -388,9 +357,8 @@ class EbmModel:
             top_k=self.query_top_k,
             hnsw_metric_function="array_cosine_distance",
         )
-
         return candidates
-    
+        
     def _check_multi_device(self):
         if (
             self.encode_args_documents is not None
@@ -489,28 +457,6 @@ class EbmModel:
             .partition_by("doc_id")
         )
 
-    def _chunk_batch(args):
-        batch_doc_ids, batch_texts, chunker = args
-        batch_chunks = []
-        batch_chunk_indices = []
-        for doc_id, text in tqdm(
-            zip(batch_doc_ids, batch_texts),
-            total=len(batch_doc_ids),
-            desc="Chunking batch",
-        ):
-            new_chunks = chunker.chunk_text(text)
-            n_chunks = len(new_chunks)
-            chunk_df = pl.DataFrame(
-                {
-                    "query_doc_id": [doc_id] * n_chunks,
-                    "chunk_position": list(range(n_chunks)),
-                    "n_chunks": [n_chunks] * n_chunks,
-                }
-            )
-            batch_chunks.extend(new_chunks)
-            batch_chunk_indices.append(chunk_df)
-        return batch_chunks, batch_chunk_indices
-
     def save(self, output_path: str, force: bool = False) -> None:
         if Path(output_path).exists() and not force:
             if self.logger:
@@ -524,10 +470,9 @@ class EbmModel:
             joblib.dump(self, output_path)
 
     @staticmethod
-    def load(input_path: str, load_generator: bool = True) -> EbmModel:
+    def load(input_path: str) -> EbmModel:
         model = joblib.load(input_path)
-        model.client = model.init_duckdb_client()
-        if load_generator:
-            model.generator = model.init_generator()
+        model._init_duckdb_client()
+        model._init_generator()
 
         return model
