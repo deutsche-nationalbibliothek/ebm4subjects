@@ -32,6 +32,26 @@ class EbmLogger:
         return self.logger
 
 
+class NullLogger:
+    def __init__(self) -> None:
+        pass
+
+    def debug(self, *args, **kwargs):
+        pass
+
+    def info(self, *args, **kwargs):
+        pass
+
+    def warning(self, *args, **kwargs):
+        pass
+
+    def error(self, *args, **kwargs):
+        pass
+
+    def critical(self, *args, **kwargs):
+        pass
+
+
 class XGBLogging(xgboost.callback.TrainingCallback):
     def __init__(
         self,

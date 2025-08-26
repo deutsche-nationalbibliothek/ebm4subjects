@@ -10,7 +10,7 @@ import xgboost as xgb
 from ebm4subjects import prepare_data
 from ebm4subjects.chunker import Chunker
 from ebm4subjects.duckdb_client import Duckdb_client
-from ebm4subjects.ebm_logging import EbmLogger, XGBLogging
+from ebm4subjects.ebm_logging import EbmLogger, NullLogger, XGBLogging
 from ebm4subjects.embedding_generator import EmbeddingGenerator
 
 
@@ -95,14 +95,15 @@ class EbmModel:
             self.logger = EbmLogger(log_path, "info").get_logger()
             self.xgb_logger = XGBLogging(self.logger, epoch_log_interval=1)
             self.xgb_callbacks = [self.xgb_logger]
+        else:
+            self.logger = NullLogger()
 
         # initialize ebm model
         self.model = None
 
     def _init_duckdb_client(self) -> None:
         if self.client is None:
-            if self.logger:
-                self.logger.info("Initializing DuckDB client")
+            self.logger.info("Initializing DuckDB client")
 
             self.client = Duckdb_client(
                 db_path=self.db_path,
@@ -115,8 +116,7 @@ class EbmModel:
 
     def _init_generator(self) -> None:
         if self.generator is None:
-            if self.logger:
-                self.logger.info("Initializing embedding generator")
+            self.logger.info("Initializing embedding generator")
 
             self.generator = EmbeddingGenerator(
                 model_name=self.embedding_model_name,
@@ -131,21 +131,18 @@ class EbmModel:
         force: bool = False,
     ) -> None:
         if vocab_out_path and Path(vocab_out_path).exists():
-            if self.logger:
-                self.logger.info(
-                    f"Loading vocabulary with embeddings from {vocab_out_path}"
-                )
+            self.logger.info(
+                f"Loading vocabulary with embeddings from {vocab_out_path}"
+            )
             collection_df = pl.read_ipc(vocab_out_path)
         else:
-            if self.logger:
-                self.logger.info("Parsing vocabulary")
+            self.logger.info("Parsing vocabulary")
             vocab = prepare_data.parse_vocab(
                 vocab_path=vocab_in_path,
                 use_altLabels=self.use_altLabels,
             )
 
-            if self.logger:
-                self.logger.info("Adding embeddings to vocabulary")
+            self.logger.info("Adding embeddings to vocabulary")
             self._init_generator()
             collection_df = prepare_data.add_vocab_embeddings(
                 vocab=vocab,
@@ -155,18 +152,15 @@ class EbmModel:
 
             if vocab_out_path:
                 if Path(vocab_out_path).exists() and not force:
-                    if self.logger:
-                        self.logger.warn(
-                            f"Cant't save vocabulary to {vocab_out_path}. File already exists"
-                        )
+                    self.logger.warn(
+                        f"Cant't save vocabulary to {vocab_out_path}. File already exists"
+                    )
                 else:
-                    if self.logger:
-                        self.logger.info(f"Saving vocabulary to {vocab_out_path}")
+                    self.logger.info(f"Saving vocabulary to {vocab_out_path}")
                     collection_df.write_ipc(vocab_out_path)
 
         self._init_duckdb_client()
-        if self.logger:
-            self.logger.info("Creating collection")
+        self.logger.info("Creating collection")
         self.client.create_collection(
             collection_df=collection_df,
             collection_name=self.collection_name,
@@ -184,19 +178,16 @@ class EbmModel:
         train_doc_ids: list[str] = None,
         train_candidates: pl.DataFrame = None,
     ) -> pl.DataFrame:
-        if self.logger:
-            self.logger.info("Preparing training data")
+        self.logger.info("Preparing training data")
         if train_candidates is None:
             if train_texts is None or train_doc_ids is None:
-                if self.logger:
-                    self.logger.error("Training texts or document IDs are missing")
+                self.logger.error("Training texts or document IDs are missing")
                 return
             train_candidates = self._prepare_train_data(
                 texts=train_texts, doc_ids=train_doc_ids
             )
 
-        if self.logger:
-            self.logger.info("Preparing gold standard")
+        self.logger.info("Preparing gold standard")
         gold_standard = pl.DataFrame(
             {
                 "doc_id": gold_doc_ids,
@@ -206,8 +197,7 @@ class EbmModel:
             pl.col("doc_id").cast(pl.String), pl.col("label_id").cast(pl.String)
         )
 
-        if self.logger:
-            self.logger.info("Prepare training data and gold standard for training")
+        self.logger.info("Prepare training data and gold standard for training")
         training_data = (
             self._compare_to_gold_standard(train_candidates, gold_standard)
             .with_columns(pl.when(pl.col("gold")).then(1).otherwise(0).alias("gold"))
@@ -269,12 +259,10 @@ class EbmModel:
     ) -> pl.DataFrame:
         self._check_multi_device()
 
-        if self.logger:
-            self.logger.info("Chunking text")
+        self.logger.info("Chunking text")
         text_chunks = self.chunker.chunk_text(text)
 
-        if self.logger:
-            self.logger.info("Creating embeddings for text chunks")
+        self.logger.info("Creating embeddings for text chunks")
         embeddings = self.generator.generate_embeddings(
             texts=text_chunks,
             **(
@@ -284,8 +272,7 @@ class EbmModel:
             ),
         )
 
-        if self.logger:
-            self.logger.info("Creating query dataframe")
+        self.logger.info("Creating query dataframe")
         query_df = pl.DataFrame(
             {
                 "query_id": [i + 1 for i in range(len(text_chunks))],
@@ -296,8 +283,7 @@ class EbmModel:
             }
         )
 
-        if self.logger:
-            self.logger.info("Running vector search and creating candidates")
+        self.logger.info("Running vector search and creating candidates")
         candidates = self.client.vector_search(
             query_df=query_df,
             collection_name=self.collection_name,
@@ -315,16 +301,14 @@ class EbmModel:
         self, texts: list[str], doc_ids: list[int]
     ) -> pl.DataFrame:
         self._check_multi_device()
-        
-        if self.logger:
-            self.logger.info("Chunking texts in batches")
+
+        self.logger.info("Chunking texts in batches")
         text_chunks, chunk_index = self.chunker.chunk_batches(
             texts, doc_ids, self.chunking_jobs, self.query_jobs
         )
 
         chunk_index = pl.concat(chunk_index).with_row_index("query_id")
-        if self.logger:
-            self.logger.info("Creating embeddings for text chunks and query dataframe")
+        self.logger.info("Creating embeddings for text chunks and query dataframe")
 
         embeddings = self.generator.generate_embeddings(
             texts=text_chunks,
@@ -338,8 +322,7 @@ class EbmModel:
         # Extend chunk_index by a list column containing the embeddings
         query_df = chunk_index.with_columns(pl.Series("embeddings", embeddings))
 
-        if self.logger:
-            self.logger.info("Running vector search and creating candidates")
+        self.logger.info("Running vector search and creating candidates")
 
         # with multi-GPU processing in the generate embeddings process
         # duckdb may throw an error due to its incompatible handling of
@@ -358,7 +341,7 @@ class EbmModel:
             hnsw_metric_function="array_cosine_distance",
         )
         return candidates
-        
+
     def _check_multi_device(self):
         if (
             self.encode_args_documents is not None
@@ -374,8 +357,7 @@ class EbmModel:
                 )
 
     def train(self, train_data: pl.DataFrame) -> None:
-        if self.logger:
-            self.logger.info("Creating training matrix")
+        self.logger.info("Creating training matrix")
         matrix = xgb.DMatrix(
             train_data.select(
                 [
@@ -394,8 +376,7 @@ class EbmModel:
         )
 
         try:
-            if self.logger:
-                self.logger.info("Starting training of XGBoost Ranker")
+            self.logger.info("Starting training of XGBoost Ranker")
             model = xgb.train(
                 params={
                     "objective": "binary:logistic",
@@ -411,22 +392,19 @@ class EbmModel:
                 num_boost_round=self.train_rounds,
                 callbacks=self.xgb_callbacks,
             )
-            if self.logger:
-                self.logger.info("Training successful finished")
+            self.logger.info("Training successful finished")
         except xgb.core.XGBoostError:
-            if self.logger:
-                self.logger.critical(
-                    "XGBoost can't train with candidates equal to gold standard "
-                    "or candidates with no match to gold standard at all - "
-                    "Check if your training data and gold standard are correct"
-                )
+            self.logger.critical(
+                "XGBoost can't train with candidates equal to gold standard "
+                "or candidates with no match to gold standard at all - "
+                "Check if your training data and gold standard are correct"
+            )
             return
 
         self.model = model
 
     def predict(self, candidates: pl.DataFrame) -> list[pl.DataFrame]:
-        if self.logger:
-            self.logger.info("Creating matrix of candidates to generate predictions")
+        self.logger.info("Creating matrix of candidates to generate predictions")
         matrix = xgb.DMatrix(
             candidates.select(
                 [
@@ -443,8 +421,7 @@ class EbmModel:
             )
         )
 
-        if self.logger:
-            self.logger.info("Making predictions for candidates")
+        self.logger.info("Making predictions for candidates")
         predictions = self.model.predict(matrix)
 
         return (
@@ -459,10 +436,9 @@ class EbmModel:
 
     def save(self, output_path: str, force: bool = False) -> None:
         if Path(output_path).exists() and not force:
-            if self.logger:
-                self.logger.warn(
-                    f"Cant't save model to {output_path}. Model already exists. Try force=True to overwrite model file"
-                )
+            self.logger.warn(
+                f"Cant't save model to {output_path}. Model already exists. Try force=True to overwrite model file"
+            )
             return
         else:
             self.client = None
