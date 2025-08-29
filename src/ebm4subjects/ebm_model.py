@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import warnings
 from pathlib import Path
 
 import joblib
@@ -142,8 +141,8 @@ class EbmModel:
                 use_altLabels=self.use_altLabels,
             )
 
-            self.logger.info("Adding embeddings to vocabulary")
             self._init_generator()
+            self.logger.info("Adding embeddings to vocabulary")
             collection_df = prepare_data.add_vocab_embeddings(
                 vocab=vocab,
                 generator=self.generator,
@@ -257,11 +256,10 @@ class EbmModel:
         text: str,
         doc_id: int,
     ) -> pl.DataFrame:
-        self._check_multi_device()
-
         self.logger.info("Chunking text")
         text_chunks = self.chunker.chunk_text(text)
 
+        self._init_generator()
         self.logger.info("Creating embeddings for text chunks")
         embeddings = self.generator.generate_embeddings(
             texts=text_chunks,
@@ -283,6 +281,7 @@ class EbmModel:
             }
         )
 
+        self._init_duckdb_client()
         self.logger.info("Running vector search and creating candidates")
         candidates = self.client.vector_search(
             query_df=query_df,
@@ -295,21 +294,22 @@ class EbmModel:
             hnsw_metric_function="array_cosine_distance",
         )
 
+        self.generator = None
+        self.client = None
+
         return candidates
 
     def generate_candidates_batch(
         self, texts: list[str], doc_ids: list[int]
     ) -> pl.DataFrame:
-        self._check_multi_device()
-
         self.logger.info("Chunking texts in batches")
         text_chunks, chunk_index = self.chunker.chunk_batches(
             texts, doc_ids, self.chunking_jobs, self.query_jobs
         )
-
+        
+        self._init_generator()
         chunk_index = pl.concat(chunk_index).with_row_index("query_id")
         self.logger.info("Creating embeddings for text chunks and query dataframe")
-
         embeddings = self.generator.generate_embeddings(
             texts=text_chunks,
             **(
@@ -320,16 +320,9 @@ class EbmModel:
         )
 
         # Extend chunk_index by a list column containing the embeddings
+        self._init_duckdb_client()
         query_df = chunk_index.with_columns(pl.Series("embeddings", embeddings))
-
         self.logger.info("Running vector search and creating candidates")
-
-        # with multi-GPU processing in the generate embeddings process
-        # duckdb may throw an error due to its incompatible handling of
-        # multiple threads. Therefore late initialization of the client
-        # is required.
-        # self._init_duckdb_client()
-
         candidates = self.client.vector_search(
             query_df=query_df,
             collection_name=self.collection_name,
@@ -340,21 +333,11 @@ class EbmModel:
             top_k=self.query_top_k,
             hnsw_metric_function="array_cosine_distance",
         )
-        return candidates
 
-    def _check_multi_device(self):
-        if (
-            self.encode_args_documents is not None
-            and "device" in self.encode_args_documents
-        ):
-            device_val = self.encode_args_documents["device"]
-            if isinstance(device_val, list) and len(device_val) > 1:
-                warnings.warn(
-                    "Multi-device (multi-GPU/CPU) processing may cause conflicts in "
-                    "generate_candidates or with duckdb multithreading if the database "
-                    "client is already initialized. Set enocding args to single device "
-                    "or use generate_candidates_batch"
-                )
+        self.generator = None
+        self.client = None
+
+        return candidates
 
     def train(self, train_data: pl.DataFrame) -> None:
         self.logger.info("Creating training matrix")
@@ -447,8 +430,4 @@ class EbmModel:
 
     @staticmethod
     def load(input_path: str) -> EbmModel:
-        model = joblib.load(input_path)
-        model._init_duckdb_client()
-        model._init_generator()
-
-        return model
+        return joblib.load(input_path)
