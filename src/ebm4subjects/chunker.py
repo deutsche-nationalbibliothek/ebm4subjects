@@ -1,16 +1,16 @@
-import os
 from concurrent.futures import ProcessPoolExecutor
 from math import ceil
 from typing import Tuple
 
-import nltk
 import polars as pl
+
+from ebm4subjects.analyzer import EbmAnalyzer
 
 
 class Chunker:
     def __init__(
         self,
-        tokenizer: str,
+        tokenizer_name: str,
         max_chunks: int | None,
         max_chunk_size: int | None,
         max_sentences: int | None,
@@ -19,13 +19,11 @@ class Chunker:
         self.max_chunk_size = max_chunk_size if max_chunk_size else float("inf")
         self.max_sentences = max_sentences if max_sentences else float("inf")
 
-        self.tokenizer = nltk.data.load(tokenizer)
-
-        os.environ["TOKENIZERS_PARALLELISM"] = "true"
+        self.tokenizer = EbmAnalyzer(tokenizer_name)
 
     def chunk_text(self, text: str) -> list[str]:
         chunks = []
-        sentences = self.tokenizer.tokenize(text)
+        sentences = self.tokenizer.tokenize_sentences(text)
         sentences = sentences[: self.max_sentences]
 
         current_chunk = []

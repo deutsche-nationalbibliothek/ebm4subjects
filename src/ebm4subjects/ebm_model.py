@@ -66,7 +66,7 @@ class EbmModel:
         # params for chunker
         # create chunker with set params
         self.chunker = Chunker(
-            tokenizer=chunk_tokenizer,
+            tokenizer_name=chunk_tokenizer,
             max_chunks=max_chunks,
             max_chunk_size=max_chunk_size,
             max_sentences=max_sentences,
@@ -148,6 +148,7 @@ class EbmModel:
                 generator=self.generator,
                 encode_args=self.encode_args_vocab,
             )
+            self.generator = None
 
             if vocab_out_path:
                 if Path(vocab_out_path).exists() and not force:
@@ -168,6 +169,7 @@ class EbmModel:
             hnsw_metric="cosine",
             force=force,
         )
+        self.client = None
 
     def prepare_train(
         self,
@@ -269,6 +271,7 @@ class EbmModel:
                 else {}
             ),
         )
+        self.generator = None
 
         self.logger.info("Creating query dataframe")
         query_df = pl.DataFrame(
@@ -293,8 +296,6 @@ class EbmModel:
             top_k=self.query_top_k,
             hnsw_metric_function="array_cosine_distance",
         )
-
-        self.generator = None
         self.client = None
 
         return candidates
@@ -318,6 +319,7 @@ class EbmModel:
                 else {}
             ),
         )
+        self.generator = None
 
         # Extend chunk_index by a list column containing the embeddings
         self._init_duckdb_client()
@@ -333,8 +335,6 @@ class EbmModel:
             top_k=self.query_top_k,
             hnsw_metric_function="array_cosine_distance",
         )
-
-        self.generator = None
         self.client = None
 
         return candidates
@@ -420,7 +420,8 @@ class EbmModel:
     def save(self, output_path: str, force: bool = False) -> None:
         if Path(output_path).exists() and not force:
             self.logger.warn(
-                f"Cant't save model to {output_path}. Model already exists. Try force=True to overwrite model file"
+                f"Cant't save model to {output_path}. Model already exists. "
+                "Try force=True to overwrite model file"
             )
             return
         else:
