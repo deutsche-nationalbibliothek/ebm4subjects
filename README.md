@@ -1,7 +1,14 @@
 # Embedding Based Matching for Automated Subject Indexing
 
-This repository implements a prototype of a simple algorithm for matching subjects with
-sentence transformer embeddings. The idea is an inverted retrieval logic: 
+**NOTE: Work in progress. This repository is still under construction.**
+
+This repository implements an algorithm for matching subjects with
+sentence transformer embeddings. While all functionality of this code
+can be run independently, this repository is not intended as 
+standalone software, but is designed to work as a backend for the
+[Annif toolkit}(https://annif.org/).
+
+The idea of embedding based matching (EBM) is an inverted retrieval logic: 
 Your target vocabulary is vectorized with a sentence transformer model, 
 the embeddings are stored in a vector storage, enabling fast search across these
 embeddings with the Hierarchical Navigable Small World Algorithm.
@@ -81,6 +88,21 @@ Embeddings of task `retrieval.query` for embedding the vocab and embeddings of t
 
 ## Vector storage
 
-This project uses DuckDB (https://duckdb.org/) as storage for the vocabulary and the generated embeddings as well as one of its extensions (DuckDB's Vector Similarity Search Extension - https://duckdb.org/docs/extensions/vss.html) for indexing and querying the embeddings. This extension allows for some configurations regarding the HNSW index and the choice of distance metric (see documentaion for details). In this project, the 'cosine' distance and the corresponding 'array_cosine_distance' function are used. The metric and function must be explicitly specified when creating and using the index and must match in order to work. To save the created index, the configuration option for the database 'hnsw_enable_experimental_persistence=true' must be set. This is not recommended at the moment, but should not be a problem for this project as no further changes are expected once the collection has been created. Relevant and useful blog posts on the VSS Extension extension can be found here 
+This project uses DuckDB (https://duckdb.org/) as storage for the vocabulary and the generated embeddings as well as one of its extensions (DuckDB's Vector Similarity Search Extension - https://duckdb.org/docs/extensions/vss.html) for indexing and querying the embeddings. 
+Benefits of duckdb are: 
+
+  * it is served as a one-file database: no independent database server needed
+  * it implements vectorized HNSW-Search
+  * it allows parallel querying from multiple threads
+
+In other words: duckdb allows a parallized vectorized vector search enabling 
+highly efficient subject retrieval even across large subject ontologies and
+also with large text corpora and longer documents. 
+
+This VSS-extension allows for some configurations regarding the HNSW index and the choice of distance metric (see documentaion for details). In this project, the 'cosine' distance and the corresponding 'array_cosine_distance' function are used. The metric and function must be explicitly specified when creating and using the index and must match in order to work. To save the created index, the configuration option for the database 'hnsw_enable_experimental_persistence=true' must be set. This is not recommended by duckdb at the moment, but should not be a problem for this project as no further changes are expected once the collection has been created. Relevant and useful blog posts on the VSS Extension extension can be found here 
 - https://duckdb.org/2024/05/03/vector-similarity-search-vss.html
 - https://duckdb.org/2024/10/23/whats-new-in-the-vss-extension.html
+
+## Usage 
+
+The main entry point for the package is the class `ebm_model` and its methods. 
