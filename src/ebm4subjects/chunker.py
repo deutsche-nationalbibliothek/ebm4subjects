@@ -43,7 +43,7 @@ class Chunker:
 
     def chunk_batches(
         self, texts: list[str], doc_ids: list[str], chunking_jobs: int, query_jobs: int
-    ) -> Tuple[list[str], list[str]]:
+    ) -> Tuple[list[str], list[pl.DataFrame]]:
         text_chunks = []
         chunk_index = []
 
