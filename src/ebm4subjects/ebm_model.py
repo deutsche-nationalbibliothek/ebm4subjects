@@ -64,13 +64,10 @@ class EbmModel:
         )
 
         # params for chunker
-        # create chunker with set params
-        self.chunker = Chunker(
-            tokenizer_name=chunk_tokenizer,
-            max_chunks=max_chunks,
-            max_chunk_size=max_chunk_size,
-            max_sentences=max_sentences,
-        )
+        self.chunk_tokenizer = chunk_tokenizer
+        self.max_chunks = max_chunks
+        self.max_chunk_size = max_chunk_size
+        self.max_sentences = max_sentences
         self.chunking_jobs = chunking_jobs
 
         # params for vector search
@@ -148,7 +145,6 @@ class EbmModel:
                 generator=self.generator,
                 encode_args=self.encode_args_vocab,
             )
-            self.generator = None
 
             if vocab_out_path:
                 if Path(vocab_out_path).exists() and not force:
@@ -169,7 +165,6 @@ class EbmModel:
             hnsw_metric="cosine",
             force=force,
         )
-        self.client = None
 
     def prepare_train(
         self,
@@ -259,7 +254,13 @@ class EbmModel:
         doc_id: int,
     ) -> pl.DataFrame:
         self.logger.info("Chunking text")
-        text_chunks = self.chunker.chunk_text(text)
+        chunker = Chunker(
+            tokenizer_name=self.chunk_tokenizer,
+            max_chunks=self.max_chunks,
+            max_chunk_size=self.max_chunk_size,
+            max_sentences=self.max_sentences,
+        )
+        text_chunks = chunker.chunk_text(text)
 
         self._init_generator()
         self.logger.info("Creating embeddings for text chunks")
@@ -271,7 +272,6 @@ class EbmModel:
                 else {}
             ),
         )
-        self.generator = None
 
         self.logger.info("Creating query dataframe")
         query_df = pl.DataFrame(
@@ -296,7 +296,6 @@ class EbmModel:
             top_k=self.query_top_k,
             hnsw_metric_function="array_cosine_distance",
         )
-        self.client = None
 
         return candidates
 
@@ -304,10 +303,17 @@ class EbmModel:
         self, texts: list[str], doc_ids: list[int]
     ) -> pl.DataFrame:
         self.logger.info("Chunking texts in batches")
-        text_chunks, chunk_index = self.chunker.chunk_batches(
+        chunker = Chunker(
+            tokenizer_name=self.chunk_tokenizer,
+            max_chunks=self.max_chunks,
+            max_chunk_size=self.max_chunk_size,
+            max_sentences=self.max_sentences,
+        )
+
+        text_chunks, chunk_index = chunker.chunk_batches(
             texts, doc_ids, self.chunking_jobs, self.query_jobs
         )
-        
+
         self._init_generator()
         chunk_index = pl.concat(chunk_index).with_row_index("query_id")
         self.logger.info("Creating embeddings for text chunks and query dataframe")
@@ -319,7 +325,6 @@ class EbmModel:
                 else {}
             ),
         )
-        self.generator = None
 
         # Extend chunk_index by a list column containing the embeddings
         self._init_duckdb_client()
@@ -335,7 +340,6 @@ class EbmModel:
             top_k=self.query_top_k,
             hnsw_metric_function="array_cosine_distance",
         )
-        self.client = None
 
         return candidates
 
