@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
@@ -10,6 +12,8 @@ class EmbeddingGenerator:
         self.model = SentenceTransformer(
             model_name, truncate_dim=embedding_dimensions, **kwargs
         )
+
+        os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
     def generate_embeddings(self, texts: list[str], **kwargs) -> np.ndarray:
         if not texts:
