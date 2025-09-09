@@ -12,31 +12,21 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "duckdb>=1.3.0",
-    "editables>=0.5",
-    "einops>=0.8.1",
     "flash-attn>=2.8.2",
-    "hatchling>=1.27.0",
-    "joblib==1.4.*",
-    "ninja>=1.11.1.4",
-    "nltk>=3.9.1",
-    "numpy==1.26.*",
+    "joblib~=1.5.1",
+    "nltk~=3.9.1",
+    "numpy~=2.2.6",
     "pandas>=2.3.0",
     "polars>=1.30.0",
-    "psutil>=7.0.0",
-    "pyarrow>=20.0.0",
+    "pyarrow>=21.0.0",
     "pyoxigraph>=0.4.11",
-    "pytest>=8.4.0",
-    "setuptools>=80.9.0",
     "sentence-transformers>=5.0.0",
-    "torch>=2.7.1",
-    "transformers>=4.52.4",
-    "triton>=3.3.1",
     "xgboost>=3.0.2",
-    "rdflib>=7.1.4",
+    "rdflib~=7.1.3",
 ]
 
 [tool.uv]
-no-build-isolation-package = ["flash-attn", "setuptools"]
+no-build-isolation-package = ["flash-attn"]
 
 [project.scripts]
 test = "test:main"

@@ -9,6 +9,9 @@ wheels/
 # Virtual environments
 .venv
 
+# uv lock file
+uv.lock
+
 # Test output
 test_out/*
 tests/run_test.py
