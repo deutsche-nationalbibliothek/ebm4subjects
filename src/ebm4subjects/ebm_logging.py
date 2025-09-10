@@ -42,6 +42,9 @@ class NullLogger:
     def info(self, *args, **kwargs):
         pass
 
+    def warn(self, *args, **kwargs):
+        pass
+
     def warning(self, *args, **kwargs):
         pass
 
