@@ -1,3 +1,5 @@
+import re
+
 import nltk.data
 
 
@@ -14,4 +16,5 @@ class EbmAnalyzer:
         self.tokenizer = nltk.data.load(tokenizer_name)
 
     def tokenize_sentences(self, text: str) -> list[str]:
+        text = re.sub("\.{4,}", ". ", text)
         return self.tokenizer.tokenize(text)
