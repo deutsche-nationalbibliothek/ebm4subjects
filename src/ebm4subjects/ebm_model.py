@@ -122,7 +122,7 @@ class EbmModel:
 
     def create_vector_db(
         self,
-        vocab_in_path: str,
+        vocab_in_path: str | None = None,
         vocab_out_path: str | None = None,
         force: bool = False,
     ) -> None:
@@ -168,26 +168,32 @@ class EbmModel:
 
     def prepare_train(
         self,
-        gold_doc_ids: list[str],
-        gold_label_ids: list[str],
-        train_texts: list[str] = None,
-        train_doc_ids: list[str] = None,
+        doc_ids: list[str],
+        label_ids: list[str],
+        texts: list[str],
         train_candidates: pl.DataFrame = None,
+        n_jobs: int = 0,
     ) -> pl.DataFrame:
         self.logger.info("Preparing training data")
-        if train_candidates is None:
-            if train_texts is None or train_doc_ids is None:
-                self.logger.error("Training texts or document IDs are missing")
-                return
-            train_candidates = self._prepare_train_data(
-                texts=train_texts, doc_ids=train_doc_ids
-            )
+        if not train_candidates:
+            if not n_jobs:
+                train_candidates = self.generate_candidates_batch(
+                    texts=texts,
+                    doc_ids=doc_ids,
+                )
+            else:
+                train_candidates = self.generate_candidates_batch(
+                    texts=texts,
+                    doc_ids=doc_ids,
+                    chunking_jobs=n_jobs,
+                    query_jobs=n_jobs,
+                )
 
         self.logger.info("Preparing gold standard")
         gold_standard = pl.DataFrame(
             {
-                "doc_id": gold_doc_ids,
-                "label_id": gold_label_ids,
+                "doc_id": doc_ids,
+                "label_id": label_ids,
             }
         ).with_columns(
             pl.col("doc_id").cast(pl.String), pl.col("label_id").cast(pl.String)
@@ -216,19 +222,6 @@ class EbmModel:
 
         return training_data
 
-    def _prepare_train_data(self, texts: list[str], doc_ids: list[int]) -> pl.DataFrame:
-        candidates_dfs = []
-
-        for text, doc_id in zip(texts, doc_ids):
-            candidates_dfs.append(
-                self.generate_candidates(
-                    text=text,
-                    doc_id=doc_id,
-                )
-            )
-
-        return pl.concat(candidates_dfs)
-
     def _compare_to_gold_standard(
         self,
         candidates: pl.DataFrame,
@@ -249,10 +242,11 @@ class EbmModel:
         )
 
     def generate_candidates(
-        self,
-        text: str,
-        doc_id: int,
+        self, text: str, doc_id: int, n_jobs: int = 0
     ) -> pl.DataFrame:
+        if not n_jobs:
+            n_jobs = self.query_jobs
+
         self.logger.info("Chunking text")
         chunker = Chunker(
             tokenizer_name=self.chunk_tokenizer,
@@ -290,7 +284,7 @@ class EbmModel:
             query_df=query_df,
             collection_name=self.collection_name,
             embedding_dimensions=self.embedding_dimensions,
-            n_jobs=self.query_jobs,
+            n_jobs=n_jobs,
             n_hits=self.max_query_hits,
             chunk_size=1024,
             top_k=self.query_top_k,
@@ -300,8 +294,17 @@ class EbmModel:
         return candidates
 
     def generate_candidates_batch(
-        self, texts: list[str], doc_ids: list[int]
+        self,
+        texts: list[str],
+        doc_ids: list[int],
+        chunking_jobs: int = 0,
+        query_jobs: int = 0,
     ) -> pl.DataFrame:
+        if not chunking_jobs:
+            chunking_jobs = self.chunking_jobs
+        if not query_jobs:
+            query_jobs = self.query_jobs
+
         self.logger.info("Chunking texts in batches")
         chunker = Chunker(
             tokenizer_name=self.chunk_tokenizer,
@@ -310,9 +313,7 @@ class EbmModel:
             max_sentences=self.max_sentences,
         )
 
-        text_chunks, chunk_index = chunker.chunk_batches(
-            texts, doc_ids, self.chunking_jobs, self.query_jobs
-        )
+        text_chunks, chunk_index = chunker.chunk_batches(texts, doc_ids, chunking_jobs)
 
         self._init_generator()
         chunk_index = pl.concat(chunk_index).with_row_index("query_id")
@@ -334,7 +335,7 @@ class EbmModel:
             query_df=query_df,
             collection_name=self.collection_name,
             embedding_dimensions=self.embedding_dimensions,
-            n_jobs=self.query_jobs,
+            n_jobs=query_jobs,
             n_hits=self.max_query_hits,
             chunk_size=1024,
             top_k=self.query_top_k,

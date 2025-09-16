@@ -42,23 +42,22 @@ class Chunker:
         return chunks
 
     def chunk_batches(
-        self, texts: list[str], doc_ids: list[str], chunking_jobs: int, query_jobs: int
+        self, texts: list[str], doc_ids: list[str], chunking_jobs: int
     ) -> Tuple[list[str], list[pl.DataFrame]]:
         text_chunks = []
         chunk_index = []
 
-        num_batches = chunking_jobs
-        chunking_batch_size = ceil(len(texts) / num_batches)
+        chunking_batch_size = ceil(len(texts) / chunking_jobs)
         batch_args = [
             (
                 doc_ids[i * chunking_batch_size : (i + 1) * chunking_batch_size],
                 texts[i * chunking_batch_size : (i + 1) * chunking_batch_size],
             )
-            for i in range(num_batches)
+            for i in range(chunking_jobs)
         ]
 
         # Use ProcessPoolExecutor for true parallelism
-        with ProcessPoolExecutor(max_workers=query_jobs) as executor:
+        with ProcessPoolExecutor(max_workers=chunking_jobs) as executor:
             results = list(executor.map(self._chunk_batch, batch_args))
 
         for batch_chunks, batch_chunk_indices in results:
