@@ -344,7 +344,10 @@ class EbmModel:
 
         return candidates
 
-    def train(self, train_data: pl.DataFrame) -> None:
+    def train(self, train_data: pl.DataFrame, n_jobs: int = 0) -> None:
+        if not n_jobs:
+            n_jobs = self.train_jobs
+
         self.logger.info("Creating training matrix")
         matrix = xgb.DMatrix(
             train_data.select(
@@ -372,7 +375,7 @@ class EbmModel:
                     "eta": self.train_shrinkage,
                     "max_depth": self.train_interaction_depth,
                     "subsample": self.train_subsample,
-                    "nthread": self.train_jobs,
+                    "nthread": n_jobs,
                 },
                 dtrain=matrix,
                 verbose_eval=False,
@@ -422,17 +425,10 @@ class EbmModel:
             .partition_by("doc_id")
         )
 
-    def save(self, output_path: str, force: bool = False) -> None:
-        if Path(output_path).exists() and not force:
-            self.logger.warn(
-                f"Cant't save model to {output_path}. Model already exists. "
-                "Try force=True to overwrite model file"
-            )
-            return
-        else:
-            self.client = None
-            self.generator = None
-            joblib.dump(self, output_path)
+    def save(self, output_path: str) -> None:
+        self.client = None
+        self.generator = None
+        joblib.dump(self, output_path)
 
     @staticmethod
     def load(input_path: str) -> EbmModel:
