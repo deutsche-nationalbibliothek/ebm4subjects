@@ -1,10 +1,26 @@
 [project]
 name = "ebm4subjects"
-version = "0.3.0"
-description = "Automated subject indexing tool"
+version = "0.3.1"
+description = "Embedding Based Matching for Automated Subject Indexing"
 authors = [
+    {name = "Deutsche Nationalbibliothek"},
+]
+maintainers = [
     {name = "Clemens Rietdorf", email = "c.rietdorf@dnb.de"},
     {name = "Maximilian Kähler", email = "m.kaehler@dnb.de"}
+]
+keywords = [
+    "code4lib",
+    "machine-learning",
+    "multilabel-classification",
+    "subject-indexing",
+    "text-classification",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: European Union Public Licence 1.2 (EUPL 1.2)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
 ]
 license = "EUPL-1.2"
 readme = "README.md"
