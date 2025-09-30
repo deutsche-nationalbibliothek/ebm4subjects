@@ -12,6 +12,9 @@ wheels/
 # uv lock file
 uv.lock
 
+# Continue helper files
+.continue/**
+
 # Test output
 test_out/*
 tests/run_test.py
