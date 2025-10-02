@@ -15,6 +15,6 @@ uv.lock
 # Continue helper files
 .continue/**
 
-# Test output
+# Test output and local test script
 test_out/*
 tests/run_test.py
