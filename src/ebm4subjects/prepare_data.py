@@ -11,13 +11,13 @@ def parse_vocab(vocab_path: str, use_altLabels: bool = True) -> pl.DataFrame:
     and label information.
 
     Args:
-    vocab_path (str): Path to the SKOS vocabulary file in Turtle format.
-    use_altLabels (bool, optional): Whether to include alternative labels
-        in the output (default: True).
+        vocab_path (str): Path to the SKOS vocabulary file in Turtle format.
+        use_altLabels (bool, optional): Whether to include alternative labels
+            in the output (default: True).
 
     Returns:
-    pl.DataFrame: A DataFrame containing label information, including label IDs,
-        label texts, and whether each label is a preferred label.
+        pl.DataFrame: A DataFrame containing label information, including label IDs,
+            label texts, and whether each label is a preferred label.
     """
     # Open the vocabulary file
     with open(vocab_path, "rb") as in_file:
@@ -59,13 +59,13 @@ def add_vocab_embeddings(
     Adds vocabulary embeddings to the given DataFrame.
 
     Args:
-    vocab (pl.DataFrame): The DataFrame containing the vocabulary.
-    generator (EmbeddingGenerator): The generator used to create the embeddings.
-    encode_args (dict, optional): Additional arguments for the embedding generator
-        (default: None).
+        vocab (pl.DataFrame): The DataFrame containing the vocabulary.
+        generator (EmbeddingGenerator): The generator used to create the embeddings.
+        encode_args (dict, optional): Additional arguments for the embedding generator
+            (default: None).
 
     Returns:
-    pl.DataFrame: The updated DataFrame with the added embeddings.
+        pl.DataFrame: The updated DataFrame with the added embeddings.
     """
     # Generate embeddings using the provided generator and vocabulary
     embeddings = generator.generate_embeddings(
