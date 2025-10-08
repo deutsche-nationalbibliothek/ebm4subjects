@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 import joblib
@@ -19,26 +20,26 @@ class EbmModel:
         db_path: str,
         collection_name: str,
         use_altLabels: bool,
-        duckdb_threads: int,
+        duckdb_threads: int | str,
         embedding_model_name: str,
-        embedding_dimensions: int,
+        embedding_dimensions: int | str,
         chunk_tokenizer: str,
-        max_chunks: int,
-        max_chunk_size: int,
-        chunking_jobs: int,
-        max_sentences: int,
-        max_query_hits: int,
-        query_top_k: int,
-        query_jobs: int,
-        xgb_shrinkage: float,
-        xgb_interaction_depth: int,
-        xgb_subsample: float,
-        xgb_rounds: int,
-        xgb_jobs: int,
-        hnsw_index_params: dict = None,
-        model_args: dict = None,
-        encode_args_vocab: dict = None,
-        encode_args_documents: dict = None,
+        max_chunks: int | str,
+        max_chunk_size: int | str,
+        chunking_jobs: int | str,
+        max_sentences: int | str,
+        max_query_hits: int | str,
+        query_top_k: int | str,
+        query_jobs: int | str,
+        xgb_shrinkage: float | str,
+        xgb_interaction_depth: int | str,
+        xgb_subsample: float | str,
+        xgb_rounds: int | str,
+        xgb_jobs: int | str,
+        hnsw_index_params: dict | str | None = None,
+        model_args: dict | str | None = None,
+        encode_args_vocab: dict | str | None = None,
+        encode_args_documents: dict | str | None = None,
         log_path: str | None = None,
     ) -> None:
         """
@@ -56,61 +57,74 @@ class EbmModel:
         and making predictions on generated candidate labels.
 
         Attributes:
-        - client (DuckDB client): The DuckDB client instance
-        - generator (EmbeddingGenerator): The EmbeddingGenerator instance
-        - chunker (Chunker): The Chunker instance
-        - model (XGBoost Ranker model): The trained XGBoost Ranker model
+            client (DuckDB client): The DuckDB client instance
+            generator (EmbeddingGenerator): The EmbeddingGenerator instance
+            chunker (Chunker): The Chunker instance
+            model (XGBoost Ranker model): The trained XGBoost Ranker model
 
         Methods:
-        - create_vector_db: Creates a vector database by loading an existing
-                            vocabulary with embeddings or generating a new
-                            vocabulary with embeddings
-        - prepare_train: Prepares the training data for the EBM model
-        - train: Trains the XGBoost Ranker model using the provided training data
-        - predict: Generates predictions for given candidates using the trained model
-        - save: Saves the current state of the EBM model to a file
-        - load: Loads an EBM model from a file
+            create_vector_db: Creates a vector database by loading an existing
+                vocabulary with embeddings or generating a new
+                vocabulary with embeddings
+            prepare_train: Prepares the training data for the EBM model
+            train: Trains the XGBoost Ranker model using the provided training data
+            predict: Generates predictions for given candidates using the trained model
+            save: Saves the current state of the EBM model to a file
+            load: Loads an EBM model from a file
+
+        Notes:
+            All parameters with type hints like 'TYPE | str' are expecting a parameter
+            of type TYPE, but can also accept the parameter as string. The parameter is
+            then cast to the needed type.
         """
         # Parameters for duckdb
         self.client = None
         self.db_path = db_path
         self.collection_name = collection_name
         self.use_altLabels = use_altLabels
-        self.duckdb_threads = duckdb_threads
-        self.hnsw_index_params = (
-            hnsw_index_params if hnsw_index_params is not None else {}
-        )
+        self.duckdb_threads = int(duckdb_threads)
+        if isinstance(hnsw_index_params, str) or not hnsw_index_params:
+            hnsw_index_params = (
+                ast.literal_eval(hnsw_index_params) if hnsw_index_params else {}
+            )
+        self.hnsw_index_params = hnsw_index_params
 
         # Parameters for embedding generator
         self.generator = None
         self.embedding_model_name = embedding_model_name
-        self.embedding_dimensions = embedding_dimensions
-        self.model_args = model_args if model_args is not None else {}
-        self.encode_args_vocab = (
-            encode_args_vocab if encode_args_vocab is not None else {}
-        )
-        self.encode_args_documents = (
-            encode_args_documents if encode_args_documents is not None else {}
-        )
+        self.embedding_dimensions = int(embedding_dimensions)
+        if isinstance(model_args, str) or not model_args:
+            model_args = ast.literal_eval(model_args) if model_args else {}
+        self.model_args = model_args
+        if isinstance(encode_args_vocab, str) or not encode_args_vocab:
+            encode_args_vocab = (
+                ast.literal_eval(encode_args_vocab) if encode_args_vocab else {}
+            )
+        self.encode_args_vocab = encode_args_vocab
+        if isinstance(encode_args_documents, str) or not encode_args_documents:
+            encode_args_documents = (
+                ast.literal_eval(encode_args_documents) if encode_args_documents else {}
+            )
+        self.encode_args_documents = encode_args_documents
 
         # Parameters for chunker
         self.chunk_tokenizer = chunk_tokenizer
-        self.max_chunks = max_chunks
-        self.max_chunk_size = max_chunk_size
-        self.max_sentences = max_sentences
-        self.chunking_jobs = chunking_jobs
+        self.max_chunks = int(max_chunks)
+        self.max_chunk_size = int(max_chunk_size)
+        self.max_sentences = int(max_sentences)
+        self.chunking_jobs = int(chunking_jobs)
 
         # Parameters for vector search
-        self.max_query_hits = max_query_hits
-        self.query_top_k = query_top_k
-        self.query_jobs = query_jobs
+        self.max_query_hits = int(max_query_hits)
+        self.query_top_k = int(query_top_k)
+        self.query_jobs = int(query_jobs)
 
         # Parameters for XGB boost ranker
-        self.train_shrinkage = xgb_shrinkage
-        self.train_interaction_depth = xgb_interaction_depth
-        self.train_subsample = xgb_subsample
-        self.train_rounds = xgb_rounds
-        self.train_jobs = xgb_jobs
+        self.train_shrinkage = float(xgb_shrinkage)
+        self.train_interaction_depth = int(xgb_interaction_depth)
+        self.train_subsample = float(xgb_subsample)
+        self.train_rounds = int(xgb_rounds)
+        self.train_jobs = int(xgb_jobs)
 
         # Parameters for logger
         # Only create logger if path to log file is set
