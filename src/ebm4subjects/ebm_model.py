@@ -567,7 +567,7 @@ class EbmModel:
             n_jobs = self.train_jobs
 
         # Select the required columns from the train_data DataFrame,
-        # convert to a Pandas DataFrame and afterwards to training matrix
+        # convert to a numpy array and afterwards to training matrix
         self.logger.info("Creating training matrix")
         matrix = xgb.DMatrix(
             train_data.select(
@@ -582,9 +582,9 @@ class EbmModel:
                     "is_prefLabel",
                     "n_chunks",
                 ]
-            ).to_pandas(),
+            ).to_numpy(),
             # Use the gold standard as the target
-            train_data.to_pandas()["gold"],
+            train_data.select("gold").to_numpy(),
         )
 
         try:
