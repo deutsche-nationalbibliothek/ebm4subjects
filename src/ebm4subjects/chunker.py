@@ -1,6 +1,6 @@
 from concurrent.futures import ProcessPoolExecutor
 from math import ceil
-from typing import Tuple
+from typing import Any, Tuple
 
 import polars as pl
 
@@ -28,7 +28,7 @@ class Chunker:
 
     def __init__(
         self,
-        tokenizer_name: str,
+        tokenizer: Any,
         max_chunks: int | None,
         max_chunk_size: int | None,
         max_sentences: int | None,
@@ -37,7 +37,7 @@ class Chunker:
         Initializes the Chunker.
 
         Args:
-            tokenizer_name (str): The name of the tokenizer to use.
+            tokenizer (Any): The name of the tokenizer to use or the tokenizer itself.
             max_chunks (int | None): The maximum number of chunks to generate.
             max_chunk_size (int | None): The maximum size of each chunk in characters.
             max_sentences (int | None): The maximum number of sentences to consider.
@@ -46,7 +46,10 @@ class Chunker:
         self.max_chunk_size = max_chunk_size if max_chunk_size else float("inf")
         self.max_sentences = max_sentences if max_sentences else float("inf")
 
-        self.tokenizer = EbmAnalyzer(tokenizer_name)
+        if type(tokenizer) is str:
+            self.tokenizer = EbmAnalyzer(tokenizer)
+        else: 
+            self.tokenizer = tokenizer
 
     def chunk_text(self, text: str) -> list[str]:
         """
