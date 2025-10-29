@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import logging
 from pathlib import Path
 
 import joblib
@@ -41,6 +42,7 @@ class EbmModel:
         encode_args_vocab: dict | str | None = None,
         encode_args_documents: dict | str | None = None,
         log_path: str | None = None,
+        logger: logging.Logger | None = None,
     ) -> None:
         """
         A class representing an Embedding-Based-Matching (EBM) model
@@ -135,6 +137,10 @@ class EbmModel:
             self.logger = EbmLogger(log_path, "info").get_logger()
             self.xgb_logger = XGBLogging(self.logger, epoch_log_interval=1)
             self.xgb_callbacks = [self.xgb_logger]
+        elif logger:
+            self.logger = logger
+            self.xgb_logger = XGBLogging(self.logger, epoch_log_interval=1)
+            self.xgb_callbacks = [self.xgb_logger]
         else:
             self.logger = NullLogger()
 
@@ -153,7 +159,9 @@ class EbmModel:
             None
         """
         if self.client is None:
-            self.logger.info("Initializing DuckDB client")
+            self.logger.info(
+                f"initializing DuckDB client with duckdb_threads: {self.duckdb_threads}"
+            )
 
             self.client = Duckdb_client(
                 db_path=self.db_path,
@@ -175,8 +183,7 @@ class EbmModel:
             None
         """
         if self.generator is None:
-            self.logger.info("Initializing embedding generator")
-
+            self.logger.info("initializing embedding generator")
             self.generator = EmbeddingGenerator(
                 model_name=self.embedding_model_name,
                 embedding_dimensions=self.embedding_dimensions,
@@ -213,12 +220,12 @@ class EbmModel:
         # Check if output path exists and load existing vocabulary if so
         if vocab_out_path and Path(vocab_out_path).exists():
             self.logger.info(
-                f"Loading vocabulary with embeddings from {vocab_out_path}"
+                f"loading vocabulary with embeddings from {vocab_out_path}"
             )
             collection_df = pl.read_ipc(vocab_out_path)
         # Parse input vocabulary if provided
         elif vocab_in_path:
-            self.logger.info("Parsing vocabulary")
+            self.logger.info("parsing vocabulary")
             vocab = prepare_data.parse_vocab(
                 vocab_path=vocab_in_path,
                 use_altLabels=self.use_altLabels,
@@ -226,7 +233,7 @@ class EbmModel:
 
             # Initialize generator and add embeddings to vocabulary
             self._init_generator()
-            self.logger.info("Adding embeddings to vocabulary")
+            self.logger.info("adding embeddings to vocabulary")
             collection_df = prepare_data.add_vocab_embeddings(
                 vocab=vocab,
                 generator=self.generator,
@@ -238,20 +245,20 @@ class EbmModel:
                 # Check if file already exists and warn if so
                 if Path(vocab_out_path).exists() and not force:
                     self.logger.warn(
-                        f"""Cant't save vocabulary to {vocab_out_path}. 
+                        f"""cant't save vocabulary to {vocab_out_path}. 
                         File already exists"""
                     )
                 else:
-                    self.logger.info(f"Saving vocabulary to {vocab_out_path}")
+                    self.logger.info(f"saving vocabulary to {vocab_out_path}")
                     collection_df.write_ipc(vocab_out_path)
         else:
             # If no existing vocabulary and no input vocabulary is provided,
             # raise an error
-            raise ValueError("Vocabulary path is required")
+            raise ValueError("vocabulary path is required")
 
         # Initialize DuckDB client and create collection
         self._init_duckdb_client()
-        self.logger.info("Creating collection")
+        self.logger.info("creating collection")
         self.client.create_collection(
             collection_df=collection_df,
             collection_name=self.collection_name,
@@ -286,8 +293,6 @@ class EbmModel:
         Returns:
             pl.DataFrame: The prepared training data.
         """
-
-        self.logger.info("Preparing training data")
         # Check if pre-computed candidate training data is provided
         if not train_candidates:
             # If not, generate candidate training data in batches
@@ -306,7 +311,6 @@ class EbmModel:
                 )
 
         # Create a gold standard data frame from the provided doc IDs and label IDs
-        self.logger.info("Preparing gold standard")
         gold_standard = pl.DataFrame(
             {
                 "doc_id": doc_ids,
@@ -318,7 +322,7 @@ class EbmModel:
 
         # Compare the candidate training data to the gold standard
         # and prepare data for the training of the XGB ranker model
-        self.logger.info("Prepare training data and gold standard for training")
+        self.logger.info("prepare training data and gold standard for training")
         training_data = (
             self._compare_to_gold_standard(train_candidates, gold_standard)
             .with_columns(pl.when(pl.col("gold")).then(1).otherwise(0).alias("gold"))
@@ -406,9 +410,9 @@ class EbmModel:
             n_jobs = self.query_jobs
 
         # Create a Chunker instance with specified parameters
-        self.logger.info("Chunking text")
+        self.logger.info("chunking text")
         chunker = Chunker(
-            tokenizer_name=self.chunk_tokenizer,
+            tokenizer=self.chunk_tokenizer,
             max_chunks=self.max_chunks,
             max_chunk_size=self.max_chunk_size,
             max_sentences=self.max_sentences,
@@ -418,7 +422,7 @@ class EbmModel:
 
         # Initialize the generator
         self._init_generator()
-        self.logger.info("Creating embeddings for text chunks")
+        self.logger.info("creating embeddings for text chunks")
         # Generate embeddings for the text chunks
         embeddings = self.generator.generate_embeddings(
             # Use the text chunks as input
@@ -432,7 +436,7 @@ class EbmModel:
         )
 
         # Create a query DataFrame
-        self.logger.info("Creating query dataframe")
+        self.logger.info("creating query dataframe")
         query_df = pl.DataFrame(
             {
                 # Create a column for the query ID
@@ -450,7 +454,9 @@ class EbmModel:
 
         # Initialize the DuckDB client
         self._init_duckdb_client()
-        self.logger.info("Running vector search and creating candidates")
+        self.logger.info(
+            f"running vector search and creating candidates with query_jobs: {n_jobs}"
+        )
         # Perform vector search using the query DataFrame
         # Using the parameters specified for the EBM model
         # and the optimal chunk size for the DuckDB
@@ -500,20 +506,20 @@ class EbmModel:
             query_jobs = self.query_jobs
 
         # Create a Chunker instance with specified parameters
-        self.logger.info("Chunking texts in batches")
         chunker = Chunker(
-            tokenizer_name=self.chunk_tokenizer,
+            tokenizer=self.chunk_tokenizer,
             max_chunks=self.max_chunks,
             max_chunk_size=self.max_chunk_size,
             max_sentences=self.max_sentences,
         )
         # Chunk the input texts
+        self.logger.info(f"chunking texts with chunking_jobs: {chunking_jobs}")
         text_chunks, chunk_index = chunker.chunk_batches(texts, doc_ids, chunking_jobs)
 
         # Initialize the generator and chunk index
         self._init_generator()
         chunk_index = pl.concat(chunk_index).with_row_index("query_id")
-        self.logger.info("Creating embeddings for text chunks and query dataframe")
+        self.logger.info("creating embeddings for text chunks and query dataframe")
         embeddings = self.generator.generate_embeddings(
             texts=text_chunks,
             **(
@@ -531,7 +537,9 @@ class EbmModel:
         # Perform vector search using the query DataFrame
         # Using the parameters specified for the EBM model
         # and the optimal chunk size for the DuckDB
-        self.logger.info("Running vector search and creating candidates")
+        self.logger.info(
+            f"running vector search and creating candidates with query_jobs: {query_jobs}"
+        )
         candidates = self.client.vector_search(
             query_df=query_df,
             collection_name=self.collection_name,
@@ -568,7 +576,7 @@ class EbmModel:
 
         # Select the required columns from the train_data DataFrame,
         # convert to a numpy array and afterwards to training matrix
-        self.logger.info("Creating training matrix")
+        self.logger.info("creating training matrix")
         matrix = xgb.DMatrix(
             train_data.select(
                 [
@@ -589,7 +597,9 @@ class EbmModel:
 
         try:
             # Train the XGBoost model with the specified parameters
-            self.logger.info("Starting training of XGBoost Ranker")
+            self.logger.info(
+                f"starting training of XGBoost Ranker with xgb_jobs: {n_jobs}"
+            )
             model = xgb.train(
                 # Train the XGBoost model with the specified parameters
                 params={
@@ -611,7 +621,7 @@ class EbmModel:
                 # Use the specified callbacks
                 callbacks=self.xgb_callbacks,
             )
-            self.logger.info("Training successful finished")
+            self.logger.info("training successful finished")
         except xgb.core.XGBoostError:
             self.logger.critical(
                 "XGBoost can't train with candidates equal to gold standard "
@@ -641,7 +651,7 @@ class EbmModel:
         """
         # Select relevant columns from the candidates DataFrame to create a matrix
         # for the trained model to make predictions
-        self.logger.info("Creating matrix of candidates to generate predictions")
+        self.logger.info("creating matrix of candidates to generate predictions")
         matrix = xgb.DMatrix(
             candidates.select(
                 [
@@ -659,7 +669,7 @@ class EbmModel:
         )
 
         # Use the trained model to make predictions on the created matrix
-        self.logger.info("Making predictions for candidates")
+        self.logger.info("making predictions for candidates")
         predictions = self.model.predict(matrix)
 
         # Transform the predictions into a list of DataFrames containing the
