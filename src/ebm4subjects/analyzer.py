@@ -32,8 +32,9 @@ class EbmAnalyzer:
             nltk.data.find(tokenizer_name)
         # If the tokenizer is not found, try to download it
         except LookupError as error:
-            if tokenizer_name in str(error):
-                nltk.download(tokenizer_name)
+            if "punkt" in str(error):
+                nltk.download("punkt")
+                nltk.download("punkt_tab")
             else:
                 raise
 
