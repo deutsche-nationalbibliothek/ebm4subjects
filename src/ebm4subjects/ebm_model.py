@@ -671,6 +671,7 @@ class EbmModel:
             .select(["doc_id", "label_id", "score"])
             # Sort the DataFrame by document ID and score in ascending and
             # descending order, respectively
+            .with_columns(pl.col("doc_id").cast(pl.Int64))
             .sort(["doc_id", "score"], descending=[False, True])
             # Group the DataFrame by document ID and aggregate the top-k labels
             # and scores for each group
