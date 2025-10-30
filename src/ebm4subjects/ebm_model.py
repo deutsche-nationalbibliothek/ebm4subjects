@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import logging
 from pathlib import Path
+from typing import Any
 
 import joblib
 import polars as pl
@@ -24,7 +25,7 @@ class EbmModel:
         duckdb_threads: int | str,
         embedding_model_name: str,
         embedding_dimensions: int | str,
-        chunk_tokenizer: str,
+        chunk_tokenizer: str | Any,
         max_chunks: int | str,
         max_chunk_size: int | str,
         chunking_jobs: int | str,
@@ -128,21 +129,8 @@ class EbmModel:
         self.train_rounds = int(xgb_rounds)
         self.train_jobs = int(xgb_jobs)
 
-        # Parameters for logger
-        # Only create logger if path to log file is set
-        self.logger = None
-        self.xgb_logger = None
-        self.xgb_callbacks = None
-        if log_path:
-            self.logger = EbmLogger(log_path, "info").get_logger()
-            self.xgb_logger = XGBLogging(self.logger, epoch_log_interval=1)
-            self.xgb_callbacks = [self.xgb_logger]
-        elif logger:
-            self.logger = logger
-            self.xgb_logger = XGBLogging(self.logger, epoch_log_interval=1)
-            self.xgb_callbacks = [self.xgb_logger]
-        else:
-            self.logger = NullLogger()
+        # Initiliaze logging
+        self.init_logger(log_path, logger)
 
         # Initialize EBM model
         self.model = None
@@ -189,6 +177,28 @@ class EbmModel:
                 embedding_dimensions=self.embedding_dimensions,
                 **self.model_args,
             )
+
+    def init_logger(
+        self, log_path: str | None = None, logger: logging.Logger | None = None
+    ) -> None:
+        """
+        Initializes the logging for the EBM model.
+
+        Returns:
+            None
+        """
+        if log_path:
+            self.logger = EbmLogger(log_path, "info").get_logger()
+            self.xgb_logger = XGBLogging(self.logger, epoch_log_interval=1)
+            self.xgb_callbacks = [self.xgb_logger]
+        elif logger:
+            self.logger = logger
+            self.xgb_logger = XGBLogging(self.logger, epoch_log_interval=1)
+            self.xgb_callbacks = [self.xgb_logger]
+        else:
+            self.logger = NullLogger()
+            self.xgb_logger = None
+            self.xgb_callbacks = None
 
     def create_vector_db(
         self,
@@ -694,7 +704,7 @@ class EbmModel:
             .partition_by("doc_id")
         )
 
-    def save(self, output_path: str) -> None:
+    def save(self, output_path: str) -> list[str]:
         """
         Saves the current state of the EBM model to a file using joblib.
 
@@ -705,12 +715,18 @@ class EbmModel:
         Args:
             output_path: The file path where the serialized model will be written.
 
+        Returns:
+            list[str]: Output path of model file.
+
         Notes:
-            The model's client and generator attributes are reset to None.
+            The model's client, generator and loggers are reset to None.
         """
         self.client = None
         self.generator = None
-        joblib.dump(self, output_path)
+
+        self.init_logger()
+
+        return joblib.dump(self, output_path)
 
     @staticmethod
     def load(input_path: str) -> EbmModel:
@@ -718,9 +734,12 @@ class EbmModel:
         Loads an EBM model from a joblib serialized file.
 
         Args:
-        input_path (str): Path to the joblib serialized file containing the EBM model.
+            input_path (str): Path to the joblib serialized file containing the EBM model.
 
         Returns:
-        EbmModel: The loaded EBM model instance.
+            EbmModel: The loaded EBM model instance.
         """
-        return joblib.load(input_path)
+        ebm_model = joblib.load(input_path)
+        ebm_model.init_logger()
+
+        return ebm_model
