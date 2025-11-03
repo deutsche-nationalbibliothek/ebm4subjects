@@ -37,9 +37,6 @@ dependencies = [
     "xgboost>=3.0.2",
 ]
 
-[tool.uv]
-no-build-isolation-package = ["flash-attn"]
-
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
