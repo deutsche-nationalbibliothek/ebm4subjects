@@ -26,10 +26,10 @@ class EbmModel:
         embedding_model_name: str,
         embedding_dimensions: int | str,
         chunk_tokenizer: str | Any,
-        max_chunks: int | str,
-        max_chunk_size: int | str,
+        max_chunk_count: int | str,
+        max_chunk_length: int | str,
         chunking_jobs: int | str,
-        max_sentences: int | str,
+        max_sentence_count: int | str,
         max_query_hits: int | str,
         query_top_k: int | str,
         query_jobs: int | str,
@@ -112,9 +112,9 @@ class EbmModel:
 
         # Parameters for chunker
         self.chunk_tokenizer = chunk_tokenizer
-        self.max_chunks = int(max_chunks)
-        self.max_chunk_size = int(max_chunk_size)
-        self.max_sentences = int(max_sentences)
+        self.max_chunk_count = int(max_chunk_count)
+        self.max_chunk_length = int(max_chunk_length)
+        self.max_sentence_count = int(max_sentence_count)
         self.chunking_jobs = int(chunking_jobs)
 
         # Parameters for vector search
@@ -423,9 +423,9 @@ class EbmModel:
         self.logger.info("chunking text")
         chunker = Chunker(
             tokenizer=self.chunk_tokenizer,
-            max_chunks=self.max_chunks,
-            max_chunk_size=self.max_chunk_size,
-            max_sentences=self.max_sentences,
+            max_chunk_count=self.max_chunk_count,
+            max_chunk_length=self.max_chunk_length,
+            max_sentence_count=self.max_sentence_count,
         )
         # Chunk the input text
         text_chunks = chunker.chunk_text(text)
@@ -518,9 +518,9 @@ class EbmModel:
         # Create a Chunker instance with specified parameters
         chunker = Chunker(
             tokenizer=self.chunk_tokenizer,
-            max_chunks=self.max_chunks,
-            max_chunk_size=self.max_chunk_size,
-            max_sentences=self.max_sentences,
+            max_chunk_count=self.max_chunk_count,
+            max_chunk_length=self.max_chunk_length,
+            max_sentence_count=self.max_sentence_count,
         )
         # Chunk the input texts
         self.logger.info(f"chunking texts with chunking_jobs: {chunking_jobs}")

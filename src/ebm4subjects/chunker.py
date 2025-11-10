@@ -17,9 +17,9 @@ class Chunker:
 
     Attributes:
         tokenizer (EbmAnalyzer): The tokenizer used for tokenizing sentences.
-        max_chunks (int): The maximum number of chunks to generate.
-        max_chunk_size (int): The maximum size of each chunk in characters.
-        max_sentences (int): The maximum number of sentences to consider.
+        max_chunk_count (int): The maximum number of chunks to generate.
+        max_chunk_length (int): The maximum size of each chunk in characters.
+        max_sentence_count (int): The maximum number of sentences to consider.
 
     Methods:
         - chunk_text: Chunks a given text into smaller sections
@@ -29,22 +29,22 @@ class Chunker:
     def __init__(
         self,
         tokenizer: Any,
-        max_chunks: int | None,
-        max_chunk_size: int | None,
-        max_sentences: int | None,
+        max_chunk_count: int | None,
+        max_chunk_length: int | None,
+        max_sentence_count: int | None,
     ):
         """
         Initializes the Chunker.
 
         Args:
             tokenizer (Any): The name of the tokenizer to use or the tokenizer itself.
-            max_chunks (int | None): The maximum number of chunks to generate.
-            max_chunk_size (int | None): The maximum size of each chunk in characters.
-            max_sentences (int | None): The maximum number of sentences to consider.
+            max_chunk_count (int | None): The maximum number of chunks to generate.
+            max_chunk_length (int | None): The maximum size of each chunk in characters.
+            max_sentence_count (int | None): The maximum number of sentences to consider.
         """
-        self.max_chunks = max_chunks if max_chunks else float("inf")
-        self.max_chunk_size = max_chunk_size if max_chunk_size else float("inf")
-        self.max_sentences = max_sentences if max_sentences else float("inf")
+        self.max_chunk_count = max_chunk_count if max_chunk_count else float("inf")
+        self.max_chunk_length = max_chunk_length if max_chunk_length else float("inf")
+        self.max_sentence_count = max_sentence_count if max_sentence_count else float("inf")
 
         if type(tokenizer) is str:
             self.tokenizer = EbmAnalyzer(tokenizer)
@@ -66,7 +66,7 @@ class Chunker:
 
         # Tokenize the text into sentences
         sentences = self.tokenizer.tokenize_sentences(text)
-        sentences = sentences[: self.max_sentences]
+        sentences = sentences[: self.max_sentence_count]
 
         # Initialize an empty list to store the current chunk
         current_chunk = []
@@ -74,18 +74,18 @@ class Chunker:
         # Iterate over the sentences
         for sentence in sentences:
             # If the current chunk is not full, add the sentence to it
-            if len(" ".join(current_chunk)) < self.max_chunk_size:
+            if len(" ".join(current_chunk)) < self.max_chunk_length:
                 current_chunk.append(sentence)
             # Otherwise, add the current chunk to the list of chunks
             # and start a new chunk
             else:
                 chunks.append(" ".join(current_chunk))
                 current_chunk = [sentence]
-                if len(chunks) == self.max_chunks:
+                if len(chunks) == self.max_chunk_count:
                     break
 
         # If the maximum number of chunks is reached, break the loop
-        if current_chunk and len(chunks) < self.max_chunks:
+        if current_chunk and len(chunks) < self.max_chunk_count:
             chunks.append(" ".join(current_chunk))
 
         # Return the chunked text
