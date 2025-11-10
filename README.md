@@ -30,6 +30,7 @@ This design borrows a lot of ideas from lexical matching like Maui [1], Kea [2] 
 
 [2] Frank, E., Paynter, G. W., Witten, I. H., Gutwin, C., & Nevill-Manning, C. G. (1999). Domain-Specific Keyphrase Extraction. Proceedings of the 16 Th International Joint Conference on Artifical Intelligence (IJCAI99), 668–673.
 
+![Embedding Based Matching Sketch](ebm-sketch.svg)
 
 ## Why embedding based matching
 
