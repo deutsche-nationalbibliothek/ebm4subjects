@@ -26,12 +26,12 @@ class EbmModel:
         embedding_model_name: str,
         embedding_dimensions: int | str,
         chunk_tokenizer: str | Any,
-        max_chunks: int | str,
-        max_chunk_size: int | str,
+        max_chunk_count: int | str,
+        max_chunk_length: int | str,
         chunking_jobs: int | str,
-        max_sentences: int | str,
-        max_query_hits: int | str,
-        query_top_k: int | str,
+        max_sentence_count: int | str,
+        candidates_per_chunk: int | str,
+        candidates_per_doc: int | str,
         query_jobs: int | str,
         xgb_shrinkage: float | str,
         xgb_interaction_depth: int | str,
@@ -112,14 +112,14 @@ class EbmModel:
 
         # Parameters for chunker
         self.chunk_tokenizer = chunk_tokenizer
-        self.max_chunks = int(max_chunks)
-        self.max_chunk_size = int(max_chunk_size)
-        self.max_sentences = int(max_sentences)
+        self.max_chunk_count = int(max_chunk_count)
+        self.max_chunk_length = int(max_chunk_length)
+        self.max_sentence_count = int(max_sentence_count)
         self.chunking_jobs = int(chunking_jobs)
 
         # Parameters for vector search
-        self.max_query_hits = int(max_query_hits)
-        self.query_top_k = int(query_top_k)
+        self.candidates_per_chunk = int(candidates_per_chunk)
+        self.candidates_per_doc = int(candidates_per_doc)
         self.query_jobs = int(query_jobs)
 
         # Parameters for XGB boost ranker
@@ -423,9 +423,9 @@ class EbmModel:
         self.logger.info("chunking text")
         chunker = Chunker(
             tokenizer=self.chunk_tokenizer,
-            max_chunks=self.max_chunks,
-            max_chunk_size=self.max_chunk_size,
-            max_sentences=self.max_sentences,
+            max_chunk_count=self.max_chunk_count,
+            max_chunk_length=self.max_chunk_length,
+            max_sentence_count=self.max_sentence_count,
         )
         # Chunk the input text
         text_chunks = chunker.chunk_text(text)
@@ -475,9 +475,9 @@ class EbmModel:
             collection_name=self.collection_name,
             embedding_dimensions=self.embedding_dimensions,
             n_jobs=n_jobs,
-            n_hits=self.max_query_hits,
+            n_hits=self.candidates_per_chunk,
             chunk_size=1024,
-            top_k=self.query_top_k,
+            top_k=self.candidates_per_doc,
             hnsw_metric_function="array_cosine_distance",
         )
 
@@ -518,9 +518,9 @@ class EbmModel:
         # Create a Chunker instance with specified parameters
         chunker = Chunker(
             tokenizer=self.chunk_tokenizer,
-            max_chunks=self.max_chunks,
-            max_chunk_size=self.max_chunk_size,
-            max_sentences=self.max_sentences,
+            max_chunk_count=self.max_chunk_count,
+            max_chunk_length=self.max_chunk_length,
+            max_sentence_count=self.max_sentence_count,
         )
         # Chunk the input texts
         self.logger.info(f"chunking texts with chunking_jobs: {chunking_jobs}")
@@ -555,9 +555,9 @@ class EbmModel:
             collection_name=self.collection_name,
             embedding_dimensions=self.embedding_dimensions,
             n_jobs=query_jobs,
-            n_hits=self.max_query_hits,
+            n_hits=self.candidates_per_chunk,
             chunk_size=1024,
-            top_k=self.query_top_k,
+            top_k=self.candidates_per_doc,
             hnsw_metric_function="array_cosine_distance",
         )
 
@@ -696,7 +696,7 @@ class EbmModel:
             # Group the DataFrame by document ID and aggregate the top-k labels
             # and scores for each group
             .group_by("doc_id")
-            .agg(pl.all().head(self.query_top_k))
+            .agg(pl.all().head(self.candidates_per_doc))
             # Explode the aggregated DataFrame to create separate rows for each
             # label and score
             .explode(["label_id", "score"])
