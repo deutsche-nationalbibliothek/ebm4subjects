@@ -19,10 +19,6 @@ from ebm4subjects.embedding_generator import EmbeddingGenerator
 class EbmModel:
     def __init__(
         self,
-        db_path: str,
-        collection_name: str,
-        use_altLabels: bool,
-        duckdb_threads: int | str,
         embedding_model_name: str,
         embedding_dimensions: int | str,
         chunk_tokenizer: str | Any,
@@ -38,6 +34,10 @@ class EbmModel:
         xgb_subsample: float | str,
         xgb_rounds: int | str,
         xgb_jobs: int | str,
+        duckdb_threads: int | str,
+        db_path: str,
+        collection_name: str ="my_collection",
+        use_altLabels: bool = True,
         hnsw_index_params: dict | str | None = None,
         model_args: dict | str | None = None,
         encode_args_vocab: dict | str | None = None,
