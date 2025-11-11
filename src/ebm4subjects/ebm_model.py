@@ -36,7 +36,7 @@ class EbmModel:
         xgb_jobs: int | str,
         duckdb_threads: int | str,
         db_path: str,
-        collection_name: str ="my_collection",
+        collection_name: str = "my_collection",
         use_altLabels: bool = True,
         hnsw_index_params: dict | str | None = None,
         model_args: dict | str | None = None,

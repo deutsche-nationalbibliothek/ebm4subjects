@@ -7,7 +7,7 @@ class EbmLogger:
     """
     A custom logger class.
 
-    This class provides a way to log messages at different levels 
+    This class provides a way to log messages at different levels
     (error, warning, info, debug) to a file.
     It also provides a way to get the logger instance.
 
@@ -16,6 +16,7 @@ class EbmLogger:
         log_path (str): The path to the log file.
         level (str): The log level (default: "info").
     """
+
     def __init__(self, log_path: str, level: str = "info") -> None:
         """
         Initializes the logger.
@@ -66,6 +67,7 @@ class NullLogger:
 
     This class is used when no logging is needed.
     """
+
     def __init__(self) -> None:
         """
         Initializes the null logger.
@@ -136,16 +138,17 @@ class NullLogger:
 class XGBLogging(xgboost.callback.TrainingCallback):
     """
     Custom XGBoost training callback for logging model performance during training.
-    
+
     Args:
         logger (logging.Logger): Logger instance to use for logging.
         epoch_log_interval (int, optional): Interval at which to log model performance
             (default: 100).
-    
+
     Attributes:
         logger (logging.Logger): Logger instance used for logging.
         epoch_log_interval (int): Interval at which to log model performance.
     """
+
     def __init__(
         self,
         logger: logging.Logger,
@@ -153,10 +156,10 @@ class XGBLogging(xgboost.callback.TrainingCallback):
     ) -> None:
         """
         Initializes the XGBLogger.
-        
+
         Args:
             logger (logging.Logger): Logger instance to use for logging.
-            epoch_log_interval (int, optional): Interval at which to log model 
+            epoch_log_interval (int, optional): Interval at which to log model
                 performance (default: to 100).
         """
         # Logger instance used for logging
@@ -172,14 +175,14 @@ class XGBLogging(xgboost.callback.TrainingCallback):
     ) -> bool:
         """
         Callback function called after each iteration of the XGBoost training process.
-        
+
         Logs model performance at the specified interval.
-        
+
         Args:
             model (xgboost.Booster): XGBoost model instance.
             epoch (int): Current epoch number.
             evals_log (dict): Dictionary containing evaluation metrics.
-        
+
         Returns:
             bool: Always returns False, as specified by the XGBoost callback API.
         """

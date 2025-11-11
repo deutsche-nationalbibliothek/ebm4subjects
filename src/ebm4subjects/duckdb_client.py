@@ -37,8 +37,8 @@ class Duckdb_client:
                 (default: {"M": 32, "ef_construction": 256, "ef_search": 256}).
 
         Notes:
-            'hnsw_enable_experimental_persistence' needs to be set to 'True' in order 
-            to store and query the index later 
+            'hnsw_enable_experimental_persistence' needs to be set to 'True' in order
+            to store and query the index later
         """
         # Establish a connection to the DuckDB database
         self.connection = duckdb.connect(
@@ -76,10 +76,10 @@ class Duckdb_client:
                 (default: "cosine")
             force (bool, optional): Whether to replace the existing collection if it
                 already exists (default: False).
-        
+
         Notes:
-            If 'hnsw_metric' is changed in this function 'hnsw_metric_function' in 
-            the vector_search function needs to be changed accordingly in order 
+            If 'hnsw_metric' is changed in this function 'hnsw_metric_function' in
+            the vector_search function needs to be changed accordingly in order
             for the index to work properly.
         """
         # Determine whether to replace the existing collection
@@ -147,10 +147,10 @@ class Duckdb_client:
             pl.DataFrame: The result of the vector search.
 
         Notes:
-            If 'hnsw_metric_function' is changed in this function 'hnsw_metric' in 
-            the create_collection function needs to be changed accordingly in order 
+            If 'hnsw_metric_function' is changed in this function 'hnsw_metric' in
+            the create_collection function needs to be changed accordingly in order
             for the index to work properly.
-            The argument 'chunk_size' is already set to the optimal value for the 
+            The argument 'chunk_size' is already set to the optimal value for the
             query processing with DuckDB. Only change it if necessary.
         """
         # Create a temporary table to store the search results

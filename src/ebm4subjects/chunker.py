@@ -44,11 +44,13 @@ class Chunker:
         """
         self.max_chunk_count = max_chunk_count if max_chunk_count else float("inf")
         self.max_chunk_length = max_chunk_length if max_chunk_length else float("inf")
-        self.max_sentence_count = max_sentence_count if max_sentence_count else float("inf")
+        self.max_sentence_count = (
+            max_sentence_count if max_sentence_count else float("inf")
+        )
 
         if type(tokenizer) is str:
             self.tokenizer = EbmAnalyzer(tokenizer)
-        else: 
+        else:
             self.tokenizer = tokenizer
 
     def chunk_text(self, text: str) -> list[str]:
