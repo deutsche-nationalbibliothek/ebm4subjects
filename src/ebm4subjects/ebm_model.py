@@ -19,7 +19,7 @@ from ebm4subjects.embedding_generator import EmbeddingGenerator
 class EbmModel:
     def __init__(
         self,
-        embedding_model_name: str,
+        embedding_model_name: str | Any,
         embedding_dimensions: int | str,
         chunk_tokenizer: str | Any,
         max_chunk_count: int | str,

@@ -9,7 +9,8 @@ class EmbeddingGenerator:
     A class for generating embeddings using a given SentenceTransformer model.
 
     Args:
-        model_name (str): The name of the SentenceTransformer model to use.
+        model_name (str, SentenceTransformer): The name of the SentenceTransformer
+            model or an SentenceTransformer model to use.
         embedding_dimensions (int): The dimensionality of the generated embeddings.
         **kwargs: Additional keyword arguments to pass to the model.
 
@@ -19,7 +20,9 @@ class EmbeddingGenerator:
         model (SentenceTransformer): The SentenceTransformer model instance.
     """
 
-    def __init__(self, model_name: str, embedding_dimensions: int, **kwargs) -> None:
+    def __init__(
+        self, model_name: str | SentenceTransformer, embedding_dimensions: int, **kwargs
+    ) -> None:
         """
         Initializes the EmbeddingGenerator.
 
@@ -31,9 +34,13 @@ class EmbeddingGenerator:
 
         # Create a SentenceTransformer model instance with the given
         # model name and embedding dimensions
-        self.model = SentenceTransformer(
-            model_name, truncate_dim=embedding_dimensions, **kwargs
-        )
+        # or set model to the given SentenceTransformer
+        if type(model_name) is str:
+            self.model = SentenceTransformer(
+                model_name, truncate_dim=embedding_dimensions, **kwargs
+            )
+        else:
+            self.model = model_name
 
         # Disabel parallelism for tokenizer
         # Needed because process might be already parallelized
