@@ -13,13 +13,16 @@ from ebm4subjects import prepare_data
 from ebm4subjects.chunker import Chunker
 from ebm4subjects.duckdb_client import Duckdb_client
 from ebm4subjects.ebm_logging import EbmLogger, NullLogger, XGBLogging
-from ebm4subjects.embedding_generator import EmbeddingGenerator
+from ebm4subjects.embedding_generator import (
+    EmbeddingGeneratorHuggingFaceTEI,
+    EmbeddingGeneratorInternal,
+    EmbeddingGeneratorMock,
+)
 
 
 class EbmModel:
     def __init__(
         self,
-        embedding_model_name: str | Any,
         embedding_dimensions: int | str,
         chunk_tokenizer: str | Any,
         max_chunk_count: int | str,
@@ -39,7 +42,9 @@ class EbmModel:
         collection_name: str = "my_collection",
         use_altLabels: bool = True,
         hnsw_index_params: dict | str | None = None,
-        model_args: dict | str | None = None,
+        embedding_model_name: str | None = None,
+        embedding_model_type: str = "internal",
+        embedding_model_args: dict | str | None = None,
         encode_args_vocab: dict | str | None = None,
         encode_args_documents: dict | str | None = None,
         log_path: str | None = None,
@@ -94,11 +99,14 @@ class EbmModel:
 
         # Parameters for embedding generator
         self.generator = None
+        self.embedding_model_type = embedding_model_type
         self.embedding_model_name = embedding_model_name
         self.embedding_dimensions = int(embedding_dimensions)
-        if isinstance(model_args, str) or not model_args:
-            model_args = ast.literal_eval(model_args) if model_args else {}
-        self.model_args = model_args
+        if isinstance(embedding_model_args, str) or not embedding_model_args:
+            embedding_model_args = (
+                ast.literal_eval(embedding_model_args) if embedding_model_args else {}
+            )
+        self.embedding_model_args = embedding_model_args
         if isinstance(encode_args_vocab, str) or not encode_args_vocab:
             encode_args_vocab = (
                 ast.literal_eval(encode_args_vocab) if encode_args_vocab else {}
@@ -171,12 +179,25 @@ class EbmModel:
             None
         """
         if self.generator is None:
-            self.logger.info("initializing embedding generator")
-            self.generator = EmbeddingGenerator(
-                model_name=self.embedding_model_name,
-                embedding_dimensions=self.embedding_dimensions,
-                **self.model_args,
-            )
+            if self.embedding_model_type == "internal":
+                self.logger.info("initializing internal embedding generator")
+                self.generator = EmbeddingGeneratorInternal(
+                    model_name=self.embedding_model_name,
+                    embedding_dimensions=self.embedding_dimensions,
+                    **self.embedding_model_args,
+                )
+            elif self.embedding_model_type == "mock":
+                self.logger.info("initializing mock embedding generator")
+                self.generator = EmbeddingGeneratorMock(self.embedding_dimensions)
+            elif self.embedding_model_type == "HuggingFaceTEI":
+                self.logger.info("initializing API embedding generator")
+                self.generator = EmbeddingGeneratorHuggingFaceTEI(
+                    embedding_dimensions=self.embedding_dimensions,
+                    **self.embedding_model_args,
+                )
+            else:
+                self.logger.error("unsupportet API for embedding generator")
+                raise NotImplementedError
 
     def init_logger(
         self, log_path: str | None = None, logger: logging.Logger | None = None
