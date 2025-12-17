@@ -102,9 +102,10 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGeneratorAPI):
         return np.array(embeddings)
 
 
-class EmbeddingGeneratorInternal(EmbeddingGenerator):
+class EmbeddingGeneratorOfflineInference(EmbeddingGenerator):
     """
-    A class for generating embeddings using a given SentenceTransformer model.
+    A class for generating embeddings using a given SentenceTransformer model
+    loaded offline with SentenceTransformer.
 
     Args:
         model_name (str): The name of the SentenceTransformer model.
@@ -118,7 +119,7 @@ class EmbeddingGeneratorInternal(EmbeddingGenerator):
 
     def __init__(self, model_name: str, embedding_dimensions: int, **kwargs) -> None:
         """
-        Initializes the internal EmbeddingGenerator.
+        Initializes the EmbeddingGenerator in offline inference mode.
 
         Sets the model name, embedding dimensions, and creates a
         SentenceTransformer model instance.

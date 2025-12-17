@@ -15,7 +15,7 @@ from ebm4subjects.duckdb_client import Duckdb_client
 from ebm4subjects.ebm_logging import EbmLogger, NullLogger, XGBLogging
 from ebm4subjects.embedding_generator import (
     EmbeddingGeneratorHuggingFaceTEI,
-    EmbeddingGeneratorInternal,
+    EmbeddingGeneratorOfflineInference,
     EmbeddingGeneratorMock,
 )
 
@@ -43,7 +43,7 @@ class EbmModel:
         use_altLabels: bool = True,
         hnsw_index_params: dict | str | None = None,
         embedding_model_name: str | None = None,
-        embedding_model_type: str = "internal",
+        embedding_model_type: str = "offline-inference",
         embedding_model_args: dict | str | None = None,
         encode_args_vocab: dict | str | None = None,
         encode_args_documents: dict | str | None = None,
@@ -179,9 +179,9 @@ class EbmModel:
             None
         """
         if self.generator is None:
-            if self.embedding_model_type == "internal":
-                self.logger.info("initializing internal embedding generator")
-                self.generator = EmbeddingGeneratorInternal(
+            if self.embedding_model_type == "offline-inference":
+                self.logger.info("initializing offline-inference embedding generator")
+                self.generator = EmbeddingGeneratorOfflineInference(
                     model_name=self.embedding_model_name,
                     embedding_dimensions=self.embedding_dimensions,
                     **self.embedding_model_args,
