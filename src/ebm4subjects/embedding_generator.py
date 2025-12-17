@@ -3,6 +3,7 @@ import os
 import numpy as np
 import requests
 from sentence_transformers import SentenceTransformer
+from tqdm import tqdm
 
 
 class EmbeddingGenerator:
@@ -86,7 +87,7 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGeneratorAPI):
             return np.empty((0, self.embedding_dimensions))
 
         # process each text
-        for text in texts:
+        for text in tqdm(texts, desc="Generating embeddings"):
             # send a request to the HuggingFaceTEI API
             data = {"inputs": text}
             response = self.session.post(
@@ -97,6 +98,7 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGeneratorAPI):
             if response.status_code == 200:
                 embeddings.append(response.json()[0])
             else:
+                # TODO: write warning to logger
                 embeddings.append([0 for _ in range(self.embedding_dimensions)])
 
         return np.array(embeddings)

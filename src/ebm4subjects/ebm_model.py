@@ -43,7 +43,7 @@ class EbmModel:
         use_altLabels: bool = True,
         hnsw_index_params: dict | str | None = None,
         embedding_model_name: str | None = None,
-        embedding_model_type: str = "offline-inference",
+        embedding_model_deployment: str = "offline-inference",
         embedding_model_args: dict | str | None = None,
         encode_args_vocab: dict | str | None = None,
         encode_args_documents: dict | str | None = None,
@@ -99,7 +99,7 @@ class EbmModel:
 
         # Parameters for embedding generator
         self.generator = None
-        self.embedding_model_type = embedding_model_type
+        self.embedding_model_deployment = embedding_model_deployment
         self.embedding_model_name = embedding_model_name
         self.embedding_dimensions = int(embedding_dimensions)
         if isinstance(embedding_model_args, str) or not embedding_model_args:
@@ -179,17 +179,17 @@ class EbmModel:
             None
         """
         if self.generator is None:
-            if self.embedding_model_type == "offline-inference":
+            if self.embedding_model_deployment == "offline-inference":
                 self.logger.info("initializing offline-inference embedding generator")
                 self.generator = EmbeddingGeneratorOfflineInference(
                     model_name=self.embedding_model_name,
                     embedding_dimensions=self.embedding_dimensions,
                     **self.embedding_model_args,
                 )
-            elif self.embedding_model_type == "mock":
+            elif self.embedding_model_deployment == "mock":
                 self.logger.info("initializing mock embedding generator")
                 self.generator = EmbeddingGeneratorMock(self.embedding_dimensions)
-            elif self.embedding_model_type == "HuggingFaceTEI":
+            elif self.embedding_model_deployment == "HuggingFaceTEI":
                 self.logger.info("initializing API embedding generator")
                 self.generator = EmbeddingGeneratorHuggingFaceTEI(
                     embedding_dimensions=self.embedding_dimensions,
