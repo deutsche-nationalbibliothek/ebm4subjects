@@ -404,7 +404,7 @@ class EbmModel:
             .join(
                 other=gold_standard.with_columns(pl.lit(True).alias("gold")),
                 on=["doc_id", "label_id"],
-                how="outer",
+                how="full",
             )
             # Fill dataframe so that all not suggested labels which are not part of
             # the gold standard and all gold standard labels which where not
