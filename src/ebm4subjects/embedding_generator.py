@@ -131,25 +131,33 @@ class EmbeddingGeneratorOpenAI(EmbeddingGeneratorAPI):
             # If empty, return an empty numpy array with the correct shape
             return np.empty((0, self.embedding_dimensions))
 
-        # process each text
-        for text in tqdm(texts, desc="Generating embeddings"):
-            # send a request to the OpenAI compatible API
+        # Process in smaller batches to avoid memory overload
+        batch_size = min(200, len(texts))  
+        embeddings = []
+        
+        for i in tqdm(range(0, len(texts), batch_size), desc="Processing batches"):
+            batch_texts = texts[i:i + batch_size]
             data = {
-                "input": text,
+                "input": batch_texts,
                 "model": self.model_name,
-                "encoding_format": "float"
-                }
+                "encoding_format": "float",
+                **kwargs
+            }
+
             response = self.session.post(
                 self.api_address, headers=self.headers, json=data
             )
 
-            # add generated embeddings to return list if request was successfull
+            # Process all embeddings from the batch response
             if response.status_code == 200:
-                embedding = response.json()['data'][0]['embedding']
-                embeddings.append(embedding)
+                response_data = response.json()
+                for i, text in enumerate(batch_texts):
+                    embedding = response_data['data'][i]['embedding']
+                    embeddings.append(embedding)
             else:
                 # TODO: write warning to logger
-                embeddings.append([0 for _ in range(self.embedding_dimensions)])
+                for _ in batch_texts:
+                    embeddings.append([0 for _ in range(self.embedding_dimensions)])
 
         return np.array(embeddings)
 
