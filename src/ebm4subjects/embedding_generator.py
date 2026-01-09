@@ -42,6 +42,7 @@ class EmbeddingGeneratorAPI(EmbeddingGenerator):
 
     def __init__(
         self,
+        model_name: str,
         embedding_dimensions: int,
         **kwargs,
     ) -> None:
@@ -53,7 +54,7 @@ class EmbeddingGeneratorAPI(EmbeddingGenerator):
         """
 
         self.embedding_dimensions = embedding_dimensions
-
+        self.model_name = model_name
         self.session = requests.Session()
         self.api_address = kwargs.get("api_address")
         self.headers = kwargs.get("headers", {"Content-Type": "application/json"})
@@ -97,6 +98,55 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGeneratorAPI):
             # add generated embeddings to return list if request was successfull
             if response.status_code == 200:
                 embeddings.append(response.json()[0])
+            else:
+                # TODO: write warning to logger
+                embeddings.append([0 for _ in range(self.embedding_dimensions)])
+
+        return np.array(embeddings)
+    
+class EmbeddingGeneratorOpenAI(EmbeddingGeneratorAPI):
+    """
+    A class for generating embeddings using any OpenAI compatibleAPI.
+    """
+
+    def generate_embeddings(self, texts: list[str], **kwargs) -> np.ndarray:
+        """
+        Generates embeddings for a list of input texts using a model
+        via an OpenAI compatible API.
+
+        Args:
+            texts (list[str]): A list of input texts.
+            **kwargs: Additional keyword arguments to pass to the
+                SentenceTransformer model.
+
+        Returns:
+            np.ndarray: A numpy array of shape (len(texts), embedding_dimensions)
+                containing the generated embeddings.
+        """
+        # prepare list for return
+        embeddings = []
+
+        # Check if the input list is empty
+        if not texts:
+            # If empty, return an empty numpy array with the correct shape
+            return np.empty((0, self.embedding_dimensions))
+
+        # process each text
+        for text in tqdm(texts, desc="Generating embeddings"):
+            # send a request to the OpenAI compatible API
+            data = {
+                "input": text,
+                "model": self.model_name,
+                "encoding_format": "float"
+                }
+            response = self.session.post(
+                self.api_address, headers=self.headers, json=data
+            )
+
+            # add generated embeddings to return list if request was successfull
+            if response.status_code == 200:
+                embedding = response.json()['data'][0]['embedding']
+                embeddings.append(embedding)
             else:
                 # TODO: write warning to logger
                 embeddings.append([0 for _ in range(self.embedding_dimensions)])
