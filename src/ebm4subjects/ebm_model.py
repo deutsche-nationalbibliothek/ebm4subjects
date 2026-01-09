@@ -14,11 +14,8 @@ from ebm4subjects.chunker import Chunker
 from ebm4subjects.duckdb_client import Duckdb_client
 from ebm4subjects.ebm_logging import EbmLogger, NullLogger, XGBLogging
 from ebm4subjects.embedding_generator import (
-    EmbeddingGeneratorHuggingFaceTEI,
-    EmbeddingGeneratorOpenAI,
-    EmbeddingGeneratorOfflineInference,
-    EmbeddingGeneratorMock,
-)
+    EmbeddingGeneratorHuggingFaceTEI, EmbeddingGeneratorMock,
+    EmbeddingGeneratorOfflineInference, EmbeddingGeneratorOpenAI)
 
 
 class EbmModel:

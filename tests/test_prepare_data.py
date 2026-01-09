@@ -1,7 +1,9 @@
-import polars as pl
 from pathlib import Path
 
+import polars as pl
+
 from ebm4subjects.prepare_data import parse_vocab
+
 
 def test_parse_vocab_reads_ttl_and_returns_dataframe(tmp_path):
     # Copy the sample vocab.ttl to a temp location
