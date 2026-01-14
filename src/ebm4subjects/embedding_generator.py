@@ -42,6 +42,7 @@ class EmbeddingGeneratorAPI(EmbeddingGenerator):
 
     def __init__(
         self,
+        model_name: str,
         embedding_dimensions: int,
         **kwargs,
     ) -> None:
@@ -53,7 +54,7 @@ class EmbeddingGeneratorAPI(EmbeddingGenerator):
         """
 
         self.embedding_dimensions = embedding_dimensions
-
+        self.model_name = model_name
         self.session = requests.Session()
         self.api_address = kwargs.get("api_address")
         self.headers = kwargs.get("headers", {"Content-Type": "application/json"})
@@ -86,20 +87,82 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGeneratorAPI):
             # If empty, return an empty numpy array with the correct shape
             return np.empty((0, self.embedding_dimensions))
 
-        # process each text
-        for text in tqdm(texts, desc="Generating embeddings"):
+        # Process in smaller batches to avoid memory overload
+        batch_size = min(32, len(texts))  # HuggingFaceTEI has a limit of 32 as default
+        
+        for i in tqdm(range(0, len(texts), batch_size), desc="Processing batches"):
+            batch_texts = texts[i:i + batch_size]
             # send a request to the HuggingFaceTEI API
-            data = {"inputs": text}
+            data = {"inputs": batch_texts, "truncate": True}
             response = self.session.post(
                 self.api_address, headers=self.headers, json=data
             )
 
             # add generated embeddings to return list if request was successfull
             if response.status_code == 200:
-                embeddings.append(response.json()[0])
+                embeddings.extend(response.json())
             else:
                 # TODO: write warning to logger
-                embeddings.append([0 for _ in range(self.embedding_dimensions)])
+                for _ in batch_texts:
+                    # TODO: ensure same format as true case and truncate dim
+                    embeddings.append([0 for _ in range(self.embedding_dimensions)])
+
+        return np.array(embeddings)
+    
+class EmbeddingGeneratorOpenAI(EmbeddingGeneratorAPI):
+    """
+    A class for generating embeddings using any OpenAI compatibleAPI.
+    """
+
+    def generate_embeddings(self, texts: list[str], **kwargs) -> np.ndarray:
+        """
+        Generates embeddings for a list of input texts using a model
+        via an OpenAI compatible API.
+
+        Args:
+            texts (list[str]): A list of input texts.
+            **kwargs: Additional keyword arguments to pass to the
+                SentenceTransformer model.
+
+        Returns:
+            np.ndarray: A numpy array of shape (len(texts), embedding_dimensions)
+                containing the generated embeddings.
+        """
+        # prepare list for return
+        embeddings = []
+
+        # Check if the input list is empty
+        if not texts:
+            # If empty, return an empty numpy array with the correct shape
+            return np.empty((0, self.embedding_dimensions))
+
+        # Process in smaller batches to avoid memory overload
+        batch_size = min(200, len(texts))  
+        embeddings = []
+        
+        for i in tqdm(range(0, len(texts), batch_size), desc="Processing batches"):
+            batch_texts = texts[i:i + batch_size]
+            data = {
+                "input": batch_texts,
+                "model": self.model_name,
+                "encoding_format": "float",
+                **kwargs
+            }
+
+            response = self.session.post(
+                self.api_address, headers=self.headers, json=data
+            )
+
+            # Process all embeddings from the batch response
+            if response.status_code == 200:
+                response_data = response.json()
+                for i, text in enumerate(batch_texts):
+                    embedding = response_data['data'][i]['embedding']
+                    embeddings.append(embedding)
+            else:
+                # TODO: write warning to logger
+                for _ in batch_texts:
+                    embeddings.append([0 for _ in range(self.embedding_dimensions)])
 
         return np.array(embeddings)
 

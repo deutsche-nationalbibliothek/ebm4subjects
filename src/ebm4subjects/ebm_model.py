@@ -14,10 +14,8 @@ from ebm4subjects.chunker import Chunker
 from ebm4subjects.duckdb_client import Duckdb_client
 from ebm4subjects.ebm_logging import EbmLogger, NullLogger, XGBLogging
 from ebm4subjects.embedding_generator import (
-    EmbeddingGeneratorHuggingFaceTEI,
-    EmbeddingGeneratorOfflineInference,
-    EmbeddingGeneratorMock,
-)
+    EmbeddingGeneratorHuggingFaceTEI, EmbeddingGeneratorMock,
+    EmbeddingGeneratorOfflineInference, EmbeddingGeneratorOpenAI)
 
 
 class EbmModel:
@@ -192,6 +190,14 @@ class EbmModel:
             elif self.embedding_model_deployment == "HuggingFaceTEI":
                 self.logger.info("initializing API embedding generator")
                 self.generator = EmbeddingGeneratorHuggingFaceTEI(
+                    model_name=self.embedding_model_name,
+                    embedding_dimensions=self.embedding_dimensions,
+                    **self.embedding_model_args,
+                )
+            elif self.embedding_model_deployment == "OpenAI":
+                self.logger.info("initializing API embedding generator")
+                self.generator = EmbeddingGeneratorOpenAI(
+                    model_name=self.embedding_model_name,
                     embedding_dimensions=self.embedding_dimensions,
                     **self.embedding_model_args,
                 )
