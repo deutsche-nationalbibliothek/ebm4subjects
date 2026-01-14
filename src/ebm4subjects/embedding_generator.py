@@ -89,9 +89,9 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGeneratorAPI):
 
         # Process in smaller batches to avoid memory overload
         batch_size = min(32, len(texts))  # HuggingFaceTEI has a limit of 32 as default
-        
+
         for i in tqdm(range(0, len(texts), batch_size), desc="Processing batches"):
-            batch_texts = texts[i:i + batch_size]
+            batch_texts = texts[i : i + batch_size]
             # send a request to the HuggingFaceTEI API
             data = {"inputs": batch_texts, "truncate": True}
             response = self.session.post(
@@ -108,7 +108,8 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGeneratorAPI):
                     embeddings.append([0 for _ in range(self.embedding_dimensions)])
 
         return np.array(embeddings)
-    
+
+
 class EmbeddingGeneratorOpenAI(EmbeddingGeneratorAPI):
     """
     A class for generating embeddings using any OpenAI compatibleAPI.
@@ -137,16 +138,16 @@ class EmbeddingGeneratorOpenAI(EmbeddingGeneratorAPI):
             return np.empty((0, self.embedding_dimensions))
 
         # Process in smaller batches to avoid memory overload
-        batch_size = min(200, len(texts))  
+        batch_size = min(200, len(texts))
         embeddings = []
-        
+
         for i in tqdm(range(0, len(texts), batch_size), desc="Processing batches"):
-            batch_texts = texts[i:i + batch_size]
+            batch_texts = texts[i : i + batch_size]
             data = {
                 "input": batch_texts,
                 "model": self.model_name,
                 "encoding_format": "float",
-                **kwargs
+                **kwargs,
             }
 
             response = self.session.post(
@@ -156,8 +157,8 @@ class EmbeddingGeneratorOpenAI(EmbeddingGeneratorAPI):
             # Process all embeddings from the batch response
             if response.status_code == 200:
                 response_data = response.json()
-                for i, text in enumerate(batch_texts):
-                    embedding = response_data['data'][i]['embedding']
+                for i, _ in enumerate(batch_texts):
+                    embedding = response_data["data"][i]["embedding"]
                     embeddings.append(embedding)
             else:
                 # TODO: write warning to logger
