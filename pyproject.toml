@@ -1,6 +1,6 @@
 [project]
 name = "ebm4subjects"
-version = "0.5.3"
+version = "0.5.4"
 description = "Embedding Based Matching for Automated Subject Indexing"
 authors = [
     {name = "Deutsche Nationalbibliothek"},
