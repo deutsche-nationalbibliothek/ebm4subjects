@@ -87,20 +87,25 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGeneratorAPI):
             # If empty, return an empty numpy array with the correct shape
             return np.empty((0, self.embedding_dimensions))
 
-        # process each text
-        for text in tqdm(texts, desc="Generating embeddings"):
+        # Process in smaller batches to avoid memory overload
+        batch_size = min(32, len(texts))  # HuggingFaceTEI has a limit of 32 as default
+        
+        for i in tqdm(range(0, len(texts), batch_size), desc="Processing batches"):
+            batch_texts = texts[i:i + batch_size]
             # send a request to the HuggingFaceTEI API
-            data = {"inputs": text}
+            data = {"inputs": batch_texts, "truncate": True}
             response = self.session.post(
                 self.api_address, headers=self.headers, json=data
             )
 
             # add generated embeddings to return list if request was successfull
             if response.status_code == 200:
-                embeddings.append(response.json()[0])
+                embeddings.extend(response.json())
             else:
                 # TODO: write warning to logger
-                embeddings.append([0 for _ in range(self.embedding_dimensions)])
+                for _ in batch_texts:
+                    # TODO: ensure same format as true case and truncate dim
+                    embeddings.append([0 for _ in range(self.embedding_dimensions)])
 
         return np.array(embeddings)
     
