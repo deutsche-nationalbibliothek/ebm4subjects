@@ -167,10 +167,10 @@ class EmbeddingGeneratorOpenAI(EmbeddingGeneratorAPI):
         return np.array(embeddings)
 
 
-class EmbeddingGeneratorOfflineInference(EmbeddingGenerator):
+class EmbeddingGeneratorInProcess(EmbeddingGenerator):
     """
     A class for generating embeddings using a given SentenceTransformer model
-    loaded offline with SentenceTransformer.
+    loaded in-process with SentenceTransformer.
 
     Args:
         model_name (str): The name of the SentenceTransformer model.
@@ -184,7 +184,7 @@ class EmbeddingGeneratorOfflineInference(EmbeddingGenerator):
 
     def __init__(self, model_name: str, embedding_dimensions: int, **kwargs) -> None:
         """
-        Initializes the EmbeddingGenerator in offline inference mode.
+        Initializes the EmbeddingGenerator in 'in-process' mode.
 
         Sets the model name, embedding dimensions, and creates a
         SentenceTransformer model instance.

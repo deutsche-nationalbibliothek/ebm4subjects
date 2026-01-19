@@ -16,7 +16,7 @@ from ebm4subjects.ebm_logging import EbmLogger, NullLogger, XGBLogging
 from ebm4subjects.embedding_generator import (
     EmbeddingGeneratorHuggingFaceTEI,
     EmbeddingGeneratorMock,
-    EmbeddingGeneratorOfflineInference,
+    EmbeddingGeneratorInProcess,
     EmbeddingGeneratorOpenAI,
 )
 
@@ -180,9 +180,9 @@ class EbmModel:
             None
         """
         if self.generator is None:
-            if self.embedding_model_deployment == "offline-inference":
+            if self.embedding_model_deployment == "in-process":
                 self.logger.info("initializing offline-inference embedding generator")
-                self.generator = EmbeddingGeneratorOfflineInference(
+                self.generator = EmbeddingGeneratorInProcess(
                     model_name=self.embedding_model_name,
                     embedding_dimensions=self.embedding_dimensions,
                     **self.embedding_model_args,
