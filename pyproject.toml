@@ -33,9 +33,10 @@ dependencies = [
     "pyarrow>=21.0.0",
     "pyoxigraph>=0.4.11",
     "rdflib~=7.1.3",
-    "sentence-transformers>=5.0.0",
     "xgboost>=3.0.2",
 ]
+[project.optional-dependencies]
+in-process=["sentence-transformers>=5.0.0"]
 
 [build-system]
 requires = ["hatchling"]

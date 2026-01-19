@@ -2,7 +2,6 @@ import os
 
 import numpy as np
 import requests
-from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
 
 
@@ -190,6 +189,8 @@ class EmbeddingGeneratorOfflineInference(EmbeddingGenerator):
         Sets the model name, embedding dimensions, and creates a
         SentenceTransformer model instance.
         """
+        from sentence_transformers import SentenceTransformer
+
         self.model_name = model_name
         self.embedding_dimensions = embedding_dimensions
 
