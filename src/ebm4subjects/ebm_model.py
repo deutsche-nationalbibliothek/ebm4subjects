@@ -50,6 +50,7 @@ class EbmModel:
         encode_args_documents: dict | str | None = None,
         log_path: str | None = None,
         logger: logging.Logger | None = None,
+        logging_level: str = "info",
     ) -> None:
         """
         A class representing an Embedding-Based-Matching (EBM) model
@@ -139,7 +140,7 @@ class EbmModel:
         self.train_jobs = int(xgb_jobs)
 
         # Initiliaze logging
-        self.init_logger(log_path, logger)
+        self.init_logger(log_path, logger, logging_level)
 
         # Initialize EBM model
         self.model = None
@@ -185,6 +186,7 @@ class EbmModel:
                 self.generator = EmbeddingGeneratorInProcess(
                     model_name=self.embedding_model_name,
                     embedding_dimensions=self.embedding_dimensions,
+                    logger=self.logger,
                     **self.embedding_model_args,
                 )
             elif self.embedding_model_deployment == "mock":
@@ -195,6 +197,7 @@ class EbmModel:
                 self.generator = EmbeddingGeneratorHuggingFaceTEI(
                     model_name=self.embedding_model_name,
                     embedding_dimensions=self.embedding_dimensions,
+                    logger=self.logger,
                     **self.embedding_model_args,
                 )
             elif self.embedding_model_deployment == "OpenAI":
@@ -202,6 +205,7 @@ class EbmModel:
                 self.generator = EmbeddingGeneratorOpenAI(
                     model_name=self.embedding_model_name,
                     embedding_dimensions=self.embedding_dimensions,
+                    logger=self.logger,
                     **self.embedding_model_args,
                 )
             else:
@@ -209,7 +213,10 @@ class EbmModel:
                 raise NotImplementedError
 
     def init_logger(
-        self, log_path: str | None = None, logger: logging.Logger | None = None
+        self,
+        log_path: str | None = None,
+        logger: logging.Logger | None = None,
+        logging_level: str = "info",
     ) -> None:
         """
         Initializes the logging for the EBM model.
@@ -218,7 +225,7 @@ class EbmModel:
             None
         """
         if log_path:
-            self.logger = EbmLogger(log_path, "info").get_logger()
+            self.logger = EbmLogger(log_path, logging_level).get_logger()
             self.xgb_logger = XGBLogging(self.logger, epoch_log_interval=1)
             self.xgb_callbacks = [self.xgb_logger]
         elif logger:

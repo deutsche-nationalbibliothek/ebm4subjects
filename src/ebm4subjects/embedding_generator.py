@@ -1,3 +1,4 @@
+import logging
 import os
 
 import numpy as np
@@ -41,6 +42,7 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGenerator):
         self,
         model_name: str,
         embedding_dimensions: int,
+        logger: logging.Logger,
         **kwargs,
     ) -> None:
         """
@@ -48,6 +50,12 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGenerator):
 
         Sets the embedding dimensions, and initiliazes and
         prepares a session with the API.
+
+        Args:
+            model_name (str): The name of the SentenceTransformer model.
+            embedding_dimensions (int): The dimensionality of the generated embeddings.
+            logger (Logger): A logger for the embedding generator.
+            **kwargs: Additional keyword arguments to pass to the model.
         """
 
         self.embedding_dimensions = embedding_dimensions
@@ -55,6 +63,37 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGenerator):
         self.session = requests.Session()
         self.api_address = kwargs.get("api_address")
         self.headers = kwargs.get("headers", {"Content-Type": "application/json"})
+
+        self.logger = logger
+        self._test_api()
+
+    def _test_api(self):
+        """
+        Tests if the API is working with the given parameters
+        """
+        response = self.session.post(
+            self.api_address,
+            headers=self.headers,
+            json={"inputs": "This is a test request!", "truncate": True},
+        )
+        if response.status_code == 200:
+            self.logger.debug(
+                "API call successful. Everything seems to be working fine."
+            )
+        elif response.status_code == 404:
+            self.logger.error(
+                "API not found under given adress! Please check the corresponding parameter!"
+            )
+            raise RuntimeError(
+                "API not found under given adress! Please check the corresponding parameter!"
+            )
+        else:
+            self.logger.error(
+                "Request to API not possible! Please check the corresponding parameters!"
+            )
+            raise RuntimeError(
+                "Request to API not possible! Please check the corresponding parameters!"
+            )
 
     def generate_embeddings(self, texts: list[str], **kwargs) -> np.ndarray:
         """
@@ -92,10 +131,19 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGenerator):
             if response.status_code == 200:
                 embeddings.extend(response.json())
             else:
-                # TODO: write warning to logger
+                self.logger.warn("Call to API NOT successful! Returning 0's.")
                 for _ in batch_texts:
-                    # TODO: ensure same format as true case and truncate dim
-                    embeddings.append([0 for _ in range(self.embedding_dimensions)])
+                    embeddings.append(
+                        [
+                            0
+                            for _ in range(
+                                min(
+                                    self.embedding_dimensions,
+                                    kwargs.get("truncate_prompt_tokens", float("inf")),
+                                ),
+                            )
+                        ]
+                    )
 
         return np.array(embeddings)
 
@@ -109,6 +157,7 @@ class EmbeddingGeneratorOpenAI(EmbeddingGenerator):
         self,
         model_name: str,
         embedding_dimensions: int,
+        logger: logging.Logger,
         **kwargs,
     ) -> None:
         """
@@ -116,6 +165,12 @@ class EmbeddingGeneratorOpenAI(EmbeddingGenerator):
 
         Sets the embedding dimensions, and initiliazes and
         prepares a session with the API.
+
+        Args:
+            model_name (str): The name of the SentenceTransformer model.
+            embedding_dimensions (int): The dimensionality of the generated embeddings.
+            logger (Logger): A logger for the embedding generator.
+            **kwargs: Additional keyword arguments to pass to the model.
         """
 
         self.embedding_dimensions = embedding_dimensions
@@ -125,6 +180,37 @@ class EmbeddingGeneratorOpenAI(EmbeddingGenerator):
             api_key = ""
 
         self.client = OpenAI(api_key=api_key, base_url=kwargs.get("api_address"))
+
+        self.logger = logger
+        self._test_api()
+
+    def _test_api(self):
+        """
+        Tests if the API is working with the given parameters
+        """
+        try:
+            _ = self.client.embeddings.create(
+                input="This is a test request!",
+                model=self.model_name,
+                encoding_format="float",
+            )
+            self.logger.debug(
+                "API call successful. Everything seems to be working fine."
+            )
+        except NotFoundError:
+            self.logger.error(
+                "API not found under given adress! Please check the corresponding parameter!"
+            )
+            raise RuntimeError(
+                "API not found under given adress! Please check the corresponding parameter!"
+            )
+        except BadRequestError:
+            self.logger.error(
+                "Request to API not possible! Please check the corresponding parameters!"
+            )
+            raise RuntimeError(
+                "Request to API not possible! Please check the corresponding parameters!"
+            )
 
     def generate_embeddings(self, texts: list[str], **kwargs) -> np.ndarray:
         """
@@ -167,7 +253,7 @@ class EmbeddingGeneratorOpenAI(EmbeddingGenerator):
                 for i, _ in enumerate(batch_texts):
                     embeddings.append(embedding_response.data[i].embedding)
             except (NotFoundError, BadRequestError):
-                # TODO: write warning to logger
+                self.logger.warn("Call to API NOT successful! Returning 0's.")
                 for _ in batch_texts:
                     embeddings.append([0 for _ in range(self.embedding_dimensions)])
 
@@ -182,14 +268,17 @@ class EmbeddingGeneratorInProcess(EmbeddingGenerator):
     Args:
         model_name (str): The name of the SentenceTransformer model.
         embedding_dimensions (int): The dimensionality of the generated embeddings.
+        logger (Logger): A logger for the embedding generator.
         **kwargs: Additional keyword arguments to pass to the model.
-
-    Attributes:
-        model_name (str): The name of the SentenceTransformer model.
-        embedding_dimensions (int): The dimensionality of the generated embeddings.
     """
 
-    def __init__(self, model_name: str, embedding_dimensions: int, **kwargs) -> None:
+    def __init__(
+        self,
+        model_name: str,
+        embedding_dimensions: int,
+        logger: logging.Logger,
+        **kwargs,
+    ) -> None:
         """
         Initializes the EmbeddingGenerator in 'in-process' mode.
 
@@ -206,6 +295,8 @@ class EmbeddingGeneratorInProcess(EmbeddingGenerator):
         self.model = SentenceTransformer(
             model_name, truncate_dim=embedding_dimensions, **kwargs
         )
+        self.logger = logger
+        self.logger.debug(f"SentenceTransfomer model running on {self.model.device}")
 
         # Disabel parallelism for tokenizer
         # Needed because process might be already parallelized
