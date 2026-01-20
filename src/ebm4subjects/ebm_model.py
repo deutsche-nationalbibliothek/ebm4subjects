@@ -769,7 +769,4 @@ class EbmModel:
         Returns:
             EbmModel: The loaded EBM model instance.
         """
-        ebm_model = joblib.load(input_path)
-        ebm_model.init_logger()
-
-        return ebm_model
+        return joblib.load(input_path)
