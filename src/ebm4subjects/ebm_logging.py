@@ -39,17 +39,17 @@ class EbmLogger:
         else:
             self.logger.setLevel(logging.NOTSET)
 
-        # Create a file handler to log messages to a file
-        log_file_handler = logging.FileHandler(f"{log_path}/ebm.log")
-        log_file_handler.setFormatter(
-            logging.Formatter(
-                "%(asctime)s %(levelname)s: %(message)s",
-                "%Y-%m-%d %H:%M:%S",
+        # Create a file handler to log messages to a file 
+        if not self.logger.handlers:
+            log_file_handler = logging.FileHandler(f"{log_path}/ebm.log")
+            log_file_handler.setFormatter(
+                logging.Formatter(
+                    "%(asctime)s %(levelname)s: %(message)s",
+                    "%Y-%m-%d %H:%M:%S",
+                )
             )
-        )
 
-        # Add the file handler to the logger
-        self.logger.addHandler(log_file_handler)
+            self.logger.addHandler(log_file_handler)
 
     def get_logger(self) -> logging.Logger:
         """
