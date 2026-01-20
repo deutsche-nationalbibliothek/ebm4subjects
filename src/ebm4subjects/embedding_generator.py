@@ -2,6 +2,7 @@ import os
 
 import numpy as np
 import requests
+from openai import BadRequestError, NotFoundError, OpenAI
 from tqdm import tqdm
 
 
@@ -31,12 +32,9 @@ class EmbeddingGenerator:
         pass
 
 
-class EmbeddingGeneratorAPI(EmbeddingGenerator):
+class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGenerator):
     """
-    A base class for API embedding generators.
-
-    Attributes:
-        embedding_dimensions (int): The dimensionality of the generated embeddings.
+    A class for generating embeddings using the HuggingFaceTEI API.
     """
 
     def __init__(
@@ -46,7 +44,7 @@ class EmbeddingGeneratorAPI(EmbeddingGenerator):
         **kwargs,
     ) -> None:
         """
-        Initializes the API EmbeddingGenerator.
+        Initializes the HuggingFaceTEI API EmbeddingGenerator.
 
         Sets the embedding dimensions, and initiliazes and
         prepares a session with the API.
@@ -58,12 +56,6 @@ class EmbeddingGeneratorAPI(EmbeddingGenerator):
         self.api_address = kwargs.get("api_address")
         self.headers = kwargs.get("headers", {"Content-Type": "application/json"})
 
-
-class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGeneratorAPI):
-    """
-    A class for generating embeddings using the HuggingFaceTEI API.
-    """
-
     def generate_embeddings(self, texts: list[str], **kwargs) -> np.ndarray:
         """
         Generates embeddings for a list of input texts using a model
@@ -71,8 +63,7 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGeneratorAPI):
 
         Args:
             texts (list[str]): A list of input texts.
-            **kwargs: Additional keyword arguments to pass to the
-                SentenceTransformer model.
+            **kwargs: Additional keyword arguments to pass to the API.
 
         Returns:
             np.ndarray: A numpy array of shape (len(texts), embedding_dimensions)
@@ -109,10 +100,31 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGeneratorAPI):
         return np.array(embeddings)
 
 
-class EmbeddingGeneratorOpenAI(EmbeddingGeneratorAPI):
+class EmbeddingGeneratorOpenAI(EmbeddingGenerator):
     """
-    A class for generating embeddings using any OpenAI compatibleAPI.
+    A class for generating embeddings using any OpenAI compatible API.
     """
+
+    def __init__(
+        self,
+        model_name: str,
+        embedding_dimensions: int,
+        **kwargs,
+    ) -> None:
+        """
+        Initializes the OpenAI API EmbeddingGenerator.
+
+        Sets the embedding dimensions, and initiliazes and
+        prepares a session with the API.
+        """
+
+        self.embedding_dimensions = embedding_dimensions
+        self.model_name = model_name
+
+        if not (api_key := os.environ.get("OPENAI_API_KEY")):
+            api_key = ""
+
+        self.client = OpenAI(api_key=api_key, base_url=kwargs.get("api_address"))
 
     def generate_embeddings(self, texts: list[str], **kwargs) -> np.ndarray:
         """
@@ -121,8 +133,7 @@ class EmbeddingGeneratorOpenAI(EmbeddingGeneratorAPI):
 
         Args:
             texts (list[str]): A list of input texts.
-            **kwargs: Additional keyword arguments to pass to the
-                SentenceTransformer model.
+            **kwargs: Additional keyword arguments to pass to the API.
 
         Returns:
             np.ndarray: A numpy array of shape (len(texts), embedding_dimensions)
@@ -142,24 +153,20 @@ class EmbeddingGeneratorOpenAI(EmbeddingGeneratorAPI):
 
         for i in tqdm(range(0, len(texts), batch_size), desc="Processing batches"):
             batch_texts = texts[i : i + batch_size]
-            data = {
-                "input": batch_texts,
-                "model": self.model_name,
-                "encoding_format": "float",
-                **kwargs,
-            }
 
-            response = self.session.post(
-                self.api_address, headers=self.headers, json=data
-            )
+            # Try to get embeddings for the batch from the API
+            try:
+                embedding_response = self.client.embeddings.create(
+                    input=batch_texts,
+                    model=self.model_name,
+                    encoding_format="float",
+                    extra_body={**kwargs},
+                )
 
-            # Process all embeddings from the batch response
-            if response.status_code == 200:
-                response_data = response.json()
+                # Process all embeddings from the batch response
                 for i, _ in enumerate(batch_texts):
-                    embedding = response_data["data"][i]["embedding"]
-                    embeddings.append(embedding)
-            else:
+                    embeddings.append(embedding_response.data[i].embedding)
+            except (NotFoundError, BadRequestError):
                 # TODO: write warning to logger
                 for _ in batch_texts:
                     embeddings.append([0 for _ in range(self.embedding_dimensions)])
