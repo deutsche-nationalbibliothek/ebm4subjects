@@ -44,7 +44,7 @@ class EbmModel:
         use_altLabels: bool = True,
         hnsw_index_params: dict | str | None = None,
         embedding_model_name: str | None = None,
-        embedding_model_deployment: str = "offline-inference",
+        embedding_model_deployment: str = "mock",
         embedding_model_args: dict | str | None = None,
         encode_args_vocab: dict | str | None = None,
         encode_args_documents: dict | str | None = None,
@@ -182,7 +182,7 @@ class EbmModel:
         """
         if self.generator is None:
             if self.embedding_model_deployment == "in-process":
-                self.logger.info("initializing offline-inference embedding generator")
+                self.logger.info("initializing in-process embedding generator")
                 self.generator = EmbeddingGeneratorInProcess(
                     model_name=self.embedding_model_name,
                     embedding_dimensions=self.embedding_dimensions,
