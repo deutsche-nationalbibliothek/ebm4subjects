@@ -101,7 +101,7 @@ class EbmModel:
 
         # Parameters for embedding generator
         self.generator = None
-        self.embedding_model_deployment = embedding_model_deployment
+        self.embedding_model_deployment = embedding_model_deployment.lower()
         self.embedding_model_name = embedding_model_name
         self.embedding_dimensions = int(embedding_dimensions)
         if isinstance(embedding_model_args, str) or not embedding_model_args:
@@ -192,7 +192,7 @@ class EbmModel:
             elif self.embedding_model_deployment == "mock":
                 self.logger.info("initializing mock embedding generator")
                 self.generator = EmbeddingGeneratorMock(self.embedding_dimensions)
-            elif self.embedding_model_deployment == "HuggingFaceTEI":
+            elif self.embedding_model_deployment == "huggingfacetei":
                 self.logger.info("initializing API embedding generator")
                 self.generator = EmbeddingGeneratorHuggingFaceTEI(
                     model_name=self.embedding_model_name,
@@ -200,7 +200,7 @@ class EbmModel:
                     logger=self.logger,
                     **self.embedding_model_args,
                 )
-            elif self.embedding_model_deployment == "OpenAI":
+            elif self.embedding_model_deployment == "openai":
                 self.logger.info("initializing API embedding generator")
                 self.generator = EmbeddingGeneratorOpenAI(
                     model_name=self.embedding_model_name,
