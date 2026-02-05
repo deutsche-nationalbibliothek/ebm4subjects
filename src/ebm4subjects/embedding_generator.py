@@ -80,17 +80,7 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGenerator):
             self.logger.debug(
                 "API call successful. Everything seems to be working fine."
             )
-        elif response.status_code == 404:
-            self.logger.error(
-                "API not found under given adress! Please check the corresponding parameter!"
-            )
-            raise RuntimeError(
-                "API not found under given adress! Please check the corresponding parameter!"
-            )
         else:
-            self.logger.error(
-                "Request to API not possible! Please check the corresponding parameters!"
-            )
             raise RuntimeError(
                 "Request to API not possible! Please check the corresponding parameters!"
             )
@@ -188,29 +178,12 @@ class EmbeddingGeneratorOpenAI(EmbeddingGenerator):
         """
         Tests if the API is working with the given parameters
         """
-        try:
-            _ = self.client.embeddings.create(
-                input="This is a test request!",
-                model=self.model_name,
-                encoding_format="float",
-            )
-            self.logger.debug(
-                "API call successful. Everything seems to be working fine."
-            )
-        except NotFoundError:
-            self.logger.error(
-                "API not found under given adress! Please check the corresponding parameter!"
-            )
-            raise RuntimeError(
-                "API not found under given adress! Please check the corresponding parameter!"
-            )
-        except BadRequestError:
-            self.logger.error(
-                "Request to API not possible! Please check the corresponding parameters!"
-            )
-            raise RuntimeError(
-                "Request to API not possible! Please check the corresponding parameters!"
-            )
+        _ = self.client.embeddings.create(
+            input="This is a test request!",
+            model=self.model_name,
+            encoding_format="float",
+        )
+        self.logger.debug("API call successful. Everything seems to be working fine.")
 
     def generate_embeddings(self, texts: list[str], **kwargs) -> np.ndarray:
         """

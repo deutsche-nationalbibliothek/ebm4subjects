@@ -209,8 +209,7 @@ class EbmModel:
                     **self.embedding_model_args,
                 )
             else:
-                self.logger.error("unsupportet API for embedding generator")
-                raise NotImplementedError
+                raise NotImplementedError("Unsupportet API for embedding generator")
 
     def init_logger(
         self,
@@ -670,7 +669,7 @@ class EbmModel:
             )
             self.logger.info("training successful finished")
         except xgb.core.XGBoostError:
-            self.logger.critical(
+            self.logger.warn(
                 "XGBoost can't train with candidates equal to gold standard "
                 "or candidates with no match to gold standard at all - "
                 "Check if your training data and gold standard are correct"
