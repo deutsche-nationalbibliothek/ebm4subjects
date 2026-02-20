@@ -290,7 +290,7 @@ class EbmModel:
             if vocab_out_path:
                 # Check if file already exists and warn if so
                 if Path(vocab_out_path).exists() and not force:
-                    self.logger.warn(
+                    self.logger.warning(
                         f"""cant't save vocabulary to {vocab_out_path}. 
                         File already exists"""
                     )
@@ -669,7 +669,7 @@ class EbmModel:
             )
             self.logger.info("training successful finished")
         except xgb.core.XGBoostError:
-            self.logger.warn(
+            self.logger.warning(
                 "XGBoost can't train with candidates equal to gold standard "
                 "or candidates with no match to gold standard at all - "
                 "Check if your training data and gold standard are correct"

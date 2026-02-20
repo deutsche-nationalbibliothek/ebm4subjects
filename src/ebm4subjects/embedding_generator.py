@@ -121,7 +121,7 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGenerator):
             if response.status_code == 200:
                 embeddings.extend(response.json())
             else:
-                self.logger.warn("Call to API NOT successful! Returning 0's.")
+                self.logger.warning("Call to API NOT successful! Returning 0's.")
                 for _ in batch_texts:
                     embeddings.append(
                         [
@@ -226,7 +226,7 @@ class EmbeddingGeneratorOpenAI(EmbeddingGenerator):
                 for i, _ in enumerate(batch_texts):
                     embeddings.append(embedding_response.data[i].embedding)
             except (NotFoundError, BadRequestError):
-                self.logger.warn("Call to API NOT successful! Returning 0's.")
+                self.logger.warning("Call to API NOT successful! Returning 0's.")
                 for _ in batch_texts:
                     embeddings.append([0 for _ in range(self.embedding_dimensions)])
 
