@@ -123,17 +123,7 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGenerator):
             else:
                 self.logger.warning("Call to API NOT successful! Returning 0's.")
                 for _ in batch_texts:
-                    embeddings.append(
-                        [
-                            0
-                            for _ in range(
-                                min(
-                                    self.embedding_dimensions,
-                                    kwargs.get("truncate_prompt_tokens", float("inf")),
-                                ),
-                            )
-                        ]
-                    )
+                    embeddings.append([0 for _ in range(self.embedding_dimensions)])
 
         return np.array(embeddings)
 
