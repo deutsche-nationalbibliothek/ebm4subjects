@@ -450,75 +450,108 @@ class EbmModel:
         Returns:
             pl.DataFrame: A DataFrame containing the generated candidate labels.
         """
-        # Check if n_jobs is provided, if not use number of jobs
-        # specified in model parameters
-        if not n_jobs:
-            n_jobs = self.query_jobs
+        # process text if not empty
+        if text:
+            # Check if n_jobs is provided, if not use number of jobs
+            # specified in model parameters
+            if not n_jobs:
+                n_jobs = self.query_jobs
 
-        # Create a Chunker instance with specified parameters
-        self.logger.info("chunking text")
-        chunker = Chunker(
-            tokenizer=self.chunk_tokenizer,
-            max_chunk_count=self.max_chunk_count,
-            max_chunk_length=self.max_chunk_length,
-            max_sentence_count=self.max_sentence_count,
-        )
-        # Chunk the input text
-        text_chunks = chunker.chunk_text(text)
+            # Create a Chunker instance with specified parameters
+            self.logger.info("chunking text")
+            chunker = Chunker(
+                tokenizer=self.chunk_tokenizer,
+                max_chunk_count=self.max_chunk_count,
+                max_chunk_length=self.max_chunk_length,
+                max_sentence_count=self.max_sentence_count,
+            )
+            # Chunk the input text
+            text_chunks = chunker.chunk_text(text)
 
-        # Initialize the generator
-        self._init_generator()
-        self.logger.info("creating embeddings for text chunks")
-        # Generate embeddings for the text chunks
-        embeddings = self.generator.generate_embeddings(
-            # Use the text chunks as input
-            texts=text_chunks,
-            # Use the encode arguments for documents if provided
-            **(
-                self.encode_args_documents
-                if self.encode_args_documents is not None
-                else {}
-            ),
-        )
+            # Initialize the generator
+            self._init_generator()
+            self.logger.info("creating embeddings for text chunks")
+            # Generate embeddings for the text chunks
+            embeddings = self.generator.generate_embeddings(
+                # Use the text chunks as input
+                texts=text_chunks,
+                # Use the encode arguments for documents if provided
+                **(
+                    self.encode_args_documents
+                    if self.encode_args_documents is not None
+                    else {}
+                ),
+            )
 
-        # Create a query DataFrame
-        self.logger.info("creating query dataframe")
-        query_df = pl.DataFrame(
-            {
-                # Create a column for the query ID
-                "query_id": [i + 1 for i in range(len(text_chunks))],
-                # Create a column for the query document ID
-                "query_doc_id": [doc_id for _ in range(len(text_chunks))],
-                # Create a column for the chunk position
-                "chunk_position": [i + 1 for i in range(len(text_chunks))],
-                # Create a column for the number of chunks
-                "n_chunks": [len(text_chunks) for _ in range(len(text_chunks))],
-                # Create a column for the embeddings
-                "embeddings": embeddings,
-            }
-        )
+            # Create a query DataFrame
+            self.logger.info("creating query dataframe")
+            query_df = pl.DataFrame(
+                {
+                    # Create a column for the query ID
+                    "query_id": [i + 1 for i in range(len(text_chunks))],
+                    # Create a column for the query document ID
+                    "query_doc_id": [doc_id for _ in range(len(text_chunks))],
+                    # Create a column for the chunk position
+                    "chunk_position": [i + 1 for i in range(len(text_chunks))],
+                    # Create a column for the number of chunks
+                    "n_chunks": [len(text_chunks) for _ in range(len(text_chunks))],
+                    # Create a column for the embeddings
+                    "embeddings": embeddings,
+                }
+            )
 
-        # Initialize the DuckDB client
-        self._init_duckdb_client()
-        self.logger.info(
-            f"running vector search and creating candidates with query_jobs: {n_jobs}"
-        )
-        # Perform vector search using the query DataFrame
-        # Using the parameters specified for the EBM model
-        # and the optimal chunk size for the DuckDB
-        candidates = self.client.vector_search(
-            query_df=query_df,
-            collection_name=self.collection_name,
-            embedding_dimensions=self.embedding_dimensions,
-            n_jobs=n_jobs,
-            n_hits=self.candidates_per_chunk,
-            chunk_size=1024,
-            top_k=self.candidates_per_doc,
-            hnsw_metric_function="array_cosine_distance",
-        )
+            # Initialize the DuckDB client
+            self._init_duckdb_client()
+            self.logger.info(
+                f"running vector search and creating candidates with query_jobs: {n_jobs}"
+            )
+            # Perform vector search using the query DataFrame
+            # Using the parameters specified for the EBM model
+            # and the optimal chunk size for the DuckDB
+            candidates = self.client.vector_search(
+                query_df=query_df,
+                collection_name=self.collection_name,
+                embedding_dimensions=self.embedding_dimensions,
+                n_jobs=n_jobs,
+                n_hits=self.candidates_per_chunk,
+                chunk_size=1024,
+                top_k=self.candidates_per_doc,
+                hnsw_metric_function="array_cosine_distance",
+            )
 
-        # Return generated candidates
-        return candidates
+            # Return generated candidates
+            return candidates
+
+        # return empty candidates dataframe if text is empty
+        else:
+            return pl.DataFrame(
+                schema={
+                    "doc_id": pl.String,
+                    "label_id": pl.String,
+                    "score": pl.Float64,
+                    "occurrences": pl.Float64,
+                    "min_cosine_similarity": pl.Float64,
+                    "max_cosine_similarity": pl.Float64,
+                    "first_occurence": pl.Float64,
+                    "last_occurence": pl.Float64,
+                    "spread": pl.Float64,
+                    "is_prefLabel": pl.Boolean,
+                    "n_chunks": pl.Int32,
+                },
+                data={
+                    "doc_id": [str(doc_id)],
+                    "label_id": None,
+                    "score": None,
+                    "occurrences": None,
+                    "min_cosine_similarity": None,
+                    "max_cosine_similarity": None,
+                    "first_occurence": None,
+                    "last_occurence": None,
+                    "spread": None,
+                    "is_prefLabel": None,
+                    "n_chunks": None,
+                },
+            )
 
     def generate_candidates_batch(
         self,
@@ -596,6 +629,31 @@ class EbmModel:
             top_k=self.candidates_per_doc,
             hnsw_metric_function="array_cosine_distance",
         )
+
+        # add empty columns for documents without candidates
+        for missing_doc_id in [
+            doc_id
+            for doc_id in [str(d) for d in doc_ids]
+            if doc_id not in candidates.get_column("doc_id").to_list()
+        ]:
+            candidates.extend(
+                pl.DataFrame(
+                    schema=candidates.schema,
+                    data={
+                        "doc_id": [str(missing_doc_id)],
+                        "label_id": None,
+                        "score": None,
+                        "occurrences": None,
+                        "min_cosine_similarity": None,
+                        "max_cosine_similarity": None,
+                        "first_occurence": None,
+                        "last_occurence": None,
+                        "spread": None,
+                        "is_prefLabel": None,
+                        "n_chunks": None,
+                    },
+                )
+            )
 
         # Return generated candidates
         return candidates
@@ -725,6 +783,13 @@ class EbmModel:
             candidates.with_columns(pl.Series(predictions).alias("score"))
             # Select the relevant columns from the updated DataFrame
             .select(["doc_id", "label_id", "score"])
+            # Set score to -1.0 if no candidate was found for document
+            .with_columns(
+                pl.when(pl.col("label_id").is_null())
+                .then(-1)
+                .otherwise(pl.col.score)
+                .alias("score")
+            )
             # Sort the DataFrame by document ID and score in ascending and
             # descending order, respectively
             .with_columns(pl.col("doc_id").cast(pl.Int64))

@@ -171,8 +171,9 @@ class Chunker:
             )
 
             # Add the chunked text sections and chunk indices to the lists
-            batch_chunks.extend(new_chunks)
-            batch_chunk_indices.append(chunk_df)
+            if new_chunks:
+                batch_chunks.extend(new_chunks)
+                batch_chunk_indices.append(chunk_df)
 
         # Return the chunked texts and the list of chunk indices
         return batch_chunks, batch_chunk_indices
