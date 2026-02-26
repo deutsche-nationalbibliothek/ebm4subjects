@@ -14,13 +14,13 @@ class EmbeddingGenerator:
 
     def __init__(self) -> None:
         """
-        Base method fot the initialization of an EmbeddingGenerator.
+        Base method for the initialization of an EmbeddingGenerator.
         """
         pass
 
     def generate_embeddings(self, texts: list[str], **kwargs) -> np.ndarray:
         """
-        Base method fot the creating embeddings with an EmbeddingGenerator.
+        Base method for the creating embeddings with an EmbeddingGenerator.
 
         Args:
             texts (list[str]): A list of input texts.
@@ -48,7 +48,7 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGenerator):
         """
         Initializes the HuggingFaceTEI API EmbeddingGenerator.
 
-        Sets the embedding dimensions, and initiliazes and
+        Sets the embedding dimensions, and initializes and
         prepares a session with the API.
 
         Args:
@@ -117,7 +117,7 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGenerator):
                 self.api_address, headers=self.headers, json=data
             )
 
-            # add generated embeddings to return list if request was successfull
+            # add generated embeddings to return list if request was successful
             if response.status_code == 200:
                 embeddings.extend(response.json())
             else:
@@ -143,7 +143,7 @@ class EmbeddingGeneratorOpenAI(EmbeddingGenerator):
         """
         Initializes the OpenAI API EmbeddingGenerator.
 
-        Sets the embedding dimensions, and initiliazes and
+        Sets the embedding dimensions, and initializes and
         prepares a session with the API.
 
         Args:
@@ -259,9 +259,9 @@ class EmbeddingGeneratorInProcess(EmbeddingGenerator):
             model_name, truncate_dim=embedding_dimensions, **kwargs
         )
         self.logger = logger
-        self.logger.debug(f"SentenceTransfomer model running on {self.model.device}")
+        self.logger.debug(f"SentenceTransformer model running on {self.model.device}")
 
-        # Disabel parallelism for tokenizer
+        # Disable parallelism for tokenizer
         # Needed because process might be already parallelized
         # before embedding creation
         os.environ["TOKENIZERS_PARALLELISM"] = "false"

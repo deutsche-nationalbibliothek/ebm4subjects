@@ -233,14 +233,14 @@ class Duckdb_client:
         )
 
         # Across chunks (queries) aggregate statistics for
-        # each tupel 'doc_id', 'label_id'
+        # each tuple 'doc_id', 'label_id'
         result_df = result_df.group_by(["doc_id", "label_id"]).agg(
             score=pl.col("score").sum(),
             occurrences=pl.col("doc_id").count(),
             min_cosine_similarity=pl.col("cosine_similarity").min(),
             max_cosine_similarity=pl.col("cosine_similarity").max(),
-            first_occurence=pl.col("chunk_position").min(),
-            last_occurence=pl.col("chunk_position").max(),
+            first_occurrence=pl.col("chunk_position").min(),
+            last_occurrence=pl.col("chunk_position").max(),
             spread=(pl.col("chunk_position").max() - pl.col("chunk_position").min()),
             is_prefLabel=pl.col("is_prefLabel").first(),
             n_chunks=pl.col("n_chunks").first(),
@@ -255,8 +255,8 @@ class Duckdb_client:
         return result_df.with_columns(
             (pl.col("score") / pl.col("n_chunks")),
             (pl.col("occurrences") / pl.col("n_chunks")),
-            (pl.col("first_occurence") / pl.col("n_chunks")),
-            (pl.col("last_occurence") / pl.col("n_chunks")),
+            (pl.col("first_occurrence") / pl.col("n_chunks")),
+            (pl.col("last_occurrence") / pl.col("n_chunks")),
             (pl.col("spread") / pl.col("n_chunks")),
         ).sort(["doc_id", "label_id"])
 

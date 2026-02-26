@@ -139,7 +139,7 @@ class EbmModel:
         self.train_rounds = int(xgb_rounds)
         self.train_jobs = int(xgb_jobs)
 
-        # Initiliaze logging
+        # Initialize logging
         self.init_logger(log_path, logger, logging_level)
 
         # Initialize EBM model
@@ -150,7 +150,7 @@ class EbmModel:
         Initializes the DuckDB client if it does not already exist.
 
         This method creates a new DuckDB client if it is not already
-        initiliazed and configures it with the provided database path,
+        initializes and configures it with the provided database path,
         thread settings, and HNSW index parameters.
 
         Returns:
@@ -379,8 +379,8 @@ class EbmModel:
                     "occurrences",
                     "min_cosine_similarity",
                     "max_cosine_similarity",
-                    "first_occurence",
-                    "last_occurence",
+                    "first_occurrence",
+                    "last_occurrence",
                     "spread",
                     "is_prefLabel",
                     "n_chunks",
@@ -445,7 +445,7 @@ class EbmModel:
             text (str): The input text.
             doc_id (int): The document ID.
             n_jobs (int, optional): The number of jobs to use for parallel
-                rocessing (default: 0).
+                processing (default: 0).
 
         Returns:
             pl.DataFrame: A DataFrame containing the generated candidate labels.
@@ -532,8 +532,8 @@ class EbmModel:
                     "occurrences": pl.Float64,
                     "min_cosine_similarity": pl.Float64,
                     "max_cosine_similarity": pl.Float64,
-                    "first_occurence": pl.Float64,
-                    "last_occurence": pl.Float64,
+                    "first_occurrence": pl.Float64,
+                    "last_occurrence": pl.Float64,
                     "spread": pl.Float64,
                     "is_prefLabel": pl.Boolean,
                     "n_chunks": pl.Int32,
@@ -545,8 +545,8 @@ class EbmModel:
                     "occurrences": None,
                     "min_cosine_similarity": None,
                     "max_cosine_similarity": None,
-                    "first_occurence": None,
-                    "last_occurence": None,
+                    "first_occurrence": None,
+                    "last_occurrence": None,
                     "spread": None,
                     "is_prefLabel": None,
                     "n_chunks": None,
@@ -646,8 +646,8 @@ class EbmModel:
                         "occurrences": None,
                         "min_cosine_similarity": None,
                         "max_cosine_similarity": None,
-                        "first_occurence": None,
-                        "last_occurence": None,
+                        "first_occurrence": None,
+                        "last_occurrence": None,
                         "spread": None,
                         "is_prefLabel": None,
                         "n_chunks": None,
@@ -688,8 +688,8 @@ class EbmModel:
                     "occurrences",
                     "min_cosine_similarity",
                     "max_cosine_similarity",
-                    "first_occurence",
-                    "last_occurence",
+                    "first_occurrence",
+                    "last_occurrence",
                     "spread",
                     "is_prefLabel",
                     "n_chunks",
@@ -763,8 +763,8 @@ class EbmModel:
                     "occurrences",
                     "min_cosine_similarity",
                     "max_cosine_similarity",
-                    "first_occurence",
-                    "last_occurence",
+                    "first_occurrence",
+                    "last_occurrence",
                     "spread",
                     "is_prefLabel",
                     "n_chunks",
