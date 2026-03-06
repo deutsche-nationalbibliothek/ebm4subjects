@@ -187,9 +187,7 @@ class EbmModel:
             "embedding_model_deployment", self.embedding_model_deployment
         ).lower()
         model_name = params.get("embedding_model_name", self.embedding_model_name)
-        embedding_dimensions = int(
-            params.get("embedding_dimensions", self.embedding_dimensions)
-        )
+        embedding_dimensions = int(self.embedding_dimensions)
         embedding_model_args = params.get(
             "embedding_model_args", self.embedding_model_args
         )
