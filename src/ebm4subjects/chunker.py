@@ -134,7 +134,7 @@ class Chunker:
             text_chunks.extend(batch_chunks)
             chunk_index.extend(batch_chunk_indices)
 
-        # Return the chunked texts and coressponding chunk indices
+        # Return the chunked texts and corresponding chunk indices
         return text_chunks, chunk_index
 
     def _chunk_batch(self, args) -> Tuple[list[str], list[pl.DataFrame]]:

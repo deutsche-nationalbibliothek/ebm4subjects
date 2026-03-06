@@ -51,7 +51,7 @@ class EbmAnalyzer:
         Returns:
             list[str]: A list of tokenized sentences.
         """
-        # Replace multiple periods by a singel one
+        # Replace multiple periods by a single one
         # Necessary to work properly with some tables of contents
         text = re.sub(r"\.{4,}", ". ", str(text))
         # Tokenize the text and return it
