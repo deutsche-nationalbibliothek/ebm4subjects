@@ -15,8 +15,8 @@ from ebm4subjects.duckdb_client import Duckdb_client
 from ebm4subjects.ebm_logging import EbmLogger, NullLogger, XGBLogging
 from ebm4subjects.embedding_generator import (
     EmbeddingGeneratorHuggingFaceTEI,
-    EmbeddingGeneratorMock,
     EmbeddingGeneratorInProcess,
+    EmbeddingGeneratorMock,
     EmbeddingGeneratorOpenAI,
 )
 
@@ -92,52 +92,37 @@ class EbmModel:
         self.db_path = db_path
         self.collection_name = collection_name
         self.use_altLabels = use_altLabels
-        self.duckdb_threads = int(duckdb_threads)
-        if isinstance(hnsw_index_params, str) or not hnsw_index_params:
-            hnsw_index_params = (
-                ast.literal_eval(hnsw_index_params) if hnsw_index_params else {}
-            )
+        self.duckdb_threads = duckdb_threads
         self.hnsw_index_params = hnsw_index_params
 
         # Parameters for embedding generator
         self.generator = None
-        self.embedding_model_deployment = embedding_model_deployment.lower()
+        self.embedding_model_deployment = embedding_model_deployment
         self.embedding_model_name = embedding_model_name
-        self.embedding_dimensions = int(embedding_dimensions)
-        if isinstance(embedding_model_args, str) or not embedding_model_args:
-            embedding_model_args = (
-                ast.literal_eval(embedding_model_args) if embedding_model_args else {}
-            )
+        self.embedding_dimensions = embedding_dimensions
+
         self.embedding_model_args = embedding_model_args
-        if isinstance(encode_args_vocab, str) or not encode_args_vocab:
-            encode_args_vocab = (
-                ast.literal_eval(encode_args_vocab) if encode_args_vocab else {}
-            )
         self.encode_args_vocab = encode_args_vocab
-        if isinstance(encode_args_documents, str) or not encode_args_documents:
-            encode_args_documents = (
-                ast.literal_eval(encode_args_documents) if encode_args_documents else {}
-            )
         self.encode_args_documents = encode_args_documents
 
         # Parameters for chunker
         self.chunk_tokenizer = chunk_tokenizer
-        self.max_chunk_count = int(max_chunk_count)
-        self.max_chunk_length = int(max_chunk_length)
-        self.max_sentence_count = int(max_sentence_count)
-        self.chunking_jobs = int(chunking_jobs)
+        self.max_chunk_count = max_chunk_count
+        self.max_chunk_length = max_chunk_length
+        self.max_sentence_count = max_sentence_count
+        self.chunking_jobs = chunking_jobs
 
         # Parameters for vector search
-        self.candidates_per_chunk = int(candidates_per_chunk)
-        self.candidates_per_doc = int(candidates_per_doc)
-        self.query_jobs = int(query_jobs)
+        self.candidates_per_chunk = candidates_per_chunk
+        self.candidates_per_doc = candidates_per_doc
+        self.query_jobs = query_jobs
 
         # Parameters for XGB boost ranker
-        self.train_shrinkage = float(xgb_shrinkage)
-        self.train_interaction_depth = int(xgb_interaction_depth)
-        self.train_subsample = float(xgb_subsample)
-        self.train_rounds = int(xgb_rounds)
-        self.train_jobs = int(xgb_jobs)
+        self.train_shrinkage = xgb_shrinkage
+        self.train_interaction_depth = xgb_interaction_depth
+        self.train_subsample = xgb_subsample
+        self.train_rounds = xgb_rounds
+        self.train_jobs = xgb_jobs
 
         # Initialize logging
         self.init_logger(log_path, logger, logging_level)
@@ -145,7 +130,7 @@ class EbmModel:
         # Initialize EBM model
         self.model = None
 
-    def _init_duckdb_client(self) -> None:
+    def _init_duckdb_client(self, params: dict[str:Any] = {}) -> None:
         """
         Initializes the DuckDB client if it does not already exist.
 
@@ -153,63 +138,97 @@ class EbmModel:
         initializes and configures it with the provided database path,
         thread settings, and HNSW index parameters.
 
+        Args:
+            params (dict, optional): A dictionary with parameters to overwrite
+                model configuration.
+
         Returns:
             None
         """
+        # parse duckdb client params
+        duckdb_threads = int(params.get("duckdb_threads", self.duckdb_threads))
+        db_path = params.get("db_path", self.db_path)
+        hnsw_index_params = params.get("hnsw_index_params", self.hnsw_index_params)
+        if isinstance(hnsw_index_params, str) or not hnsw_index_params:
+            hnsw_index_params = (
+                ast.literal_eval(hnsw_index_params) if hnsw_index_params else {}
+            )
+
+        # initiliaze client
         if self.client is None:
             self.logger.info(
-                f"initializing DuckDB client with duckdb_threads: {self.duckdb_threads}"
+                f"initializing DuckDB client with duckdb_threads: {duckdb_threads}"
             )
-
             self.client = Duckdb_client(
-                db_path=self.db_path,
+                db_path=db_path,
                 config={
                     "hnsw_enable_experimental_persistence": True,
-                    "threads": self.duckdb_threads,
+                    "threads": duckdb_threads,
                 },
-                hnsw_index_params=self.hnsw_index_params,
+                hnsw_index_params=hnsw_index_params,
             )
 
-    def _init_generator(self) -> None:
+    def _init_generator(self, params: dict[str:Any] = {}) -> None:
         """
         Initializes the embedding generator if it does not already exist.
 
         If the generator is not initialized, it creates a new EmbeddingGenerator
         with the specified model name, embedding dimensions, and model arguments.
 
+        Args:
+            params (dict, optional): A dictionary with parameters to overwrite
+                model configuration.
+
         Returns:
             None
         """
+        # parse embedding generator params
+        embedding_model_deployment = params.get(
+            "embedding_model_deployment", self.embedding_model_deployment
+        ).lower()
+        model_name = self.embedding_model_name
+        embedding_dimensions = int(self.embedding_dimensions)
+        embedding_model_args = params.get(
+            "embedding_model_args", self.embedding_model_args
+        )
+        if isinstance(embedding_model_args, str) or not embedding_model_args:
+            embedding_model_args = (
+                ast.literal_eval(embedding_model_args) if embedding_model_args else {}
+            )
+
+        # initiliaze embedding generator
         if self.generator is None:
-            if self.embedding_model_deployment == "in-process":
+            if embedding_model_deployment == "in-process":
                 self.logger.info("initializing in-process embedding generator")
                 self.generator = EmbeddingGeneratorInProcess(
-                    model_name=self.embedding_model_name,
-                    embedding_dimensions=self.embedding_dimensions,
+                    model_name=model_name,
+                    embedding_dimensions=embedding_dimensions,
                     logger=self.logger,
-                    **self.embedding_model_args,
+                    **embedding_model_args,
                 )
-            elif self.embedding_model_deployment == "mock":
+            elif embedding_model_deployment == "mock":
                 self.logger.info("initializing mock embedding generator")
-                self.generator = EmbeddingGeneratorMock(self.embedding_dimensions)
-            elif self.embedding_model_deployment == "huggingfacetei":
+                self.generator = EmbeddingGeneratorMock(embedding_dimensions)
+            elif embedding_model_deployment == "huggingfacetei":
                 self.logger.info("initializing API embedding generator")
                 self.generator = EmbeddingGeneratorHuggingFaceTEI(
-                    model_name=self.embedding_model_name,
-                    embedding_dimensions=self.embedding_dimensions,
+                    model_name=model_name,
+                    embedding_dimensions=embedding_dimensions,
                     logger=self.logger,
-                    **self.embedding_model_args,
+                    **embedding_model_args,
                 )
-            elif self.embedding_model_deployment == "openai":
+            elif embedding_model_deployment == "openai":
                 self.logger.info("initializing API embedding generator")
                 self.generator = EmbeddingGeneratorOpenAI(
-                    model_name=self.embedding_model_name,
-                    embedding_dimensions=self.embedding_dimensions,
+                    model_name=model_name,
+                    embedding_dimensions=embedding_dimensions,
                     logger=self.logger,
-                    **self.embedding_model_args,
+                    **embedding_model_args,
                 )
             else:
-                raise NotImplementedError("Unsupportet API for embedding generator")
+                raise NotImplementedError(
+                    f"Unsupportet deployment '{embedding_model_deployment}' for embedding generator"
+                )
 
     def init_logger(
         self,
@@ -279,11 +298,17 @@ class EbmModel:
 
             # Initialize generator and add embeddings to vocabulary
             self._init_generator()
+
+            encode_args_vocab = self.encode_args_vocab
+            if isinstance(encode_args_vocab, str) or not encode_args_vocab:
+                encode_args_vocab = (
+                    ast.literal_eval(encode_args_vocab) if encode_args_vocab else {}
+                )
             self.logger.info("adding embeddings to vocabulary")
             collection_df = prepare_data.add_vocab_embeddings(
                 vocab=vocab,
                 generator=self.generator,
-                encode_args=self.encode_args_vocab,
+                encode_args=encode_args_vocab,
             )
 
             # Save vocabulary to output path if specified
@@ -308,7 +333,7 @@ class EbmModel:
         self.client.create_collection(
             collection_df=collection_df,
             collection_name=self.collection_name,
-            embedding_dimensions=self.embedding_dimensions,
+            embedding_dimensions=int(self.embedding_dimensions),
             hnsw_index_name="hnsw_index",
             hnsw_metric="cosine",
             force=force,
@@ -320,7 +345,7 @@ class EbmModel:
         label_ids: list[str],
         texts: list[str],
         train_candidates: pl.DataFrame = None,
-        n_jobs: int = 0,
+        params: dict[str:Any] = {},
     ) -> pl.DataFrame:
         """
         Prepares the training data for the EBM model.
@@ -333,28 +358,20 @@ class EbmModel:
             doc_ids (list[str]): A list of document IDs.
             label_ids (list[str]): A list of label IDs.
             texts (list[str]): A list of text data.
-            train_candidates (pl.DataFrame, optional): Pre-computed candidate training data (default: None).
-            n_jobs (int, optional): The number of jobs to use for parallel processing (default: 0).
+            train_candidates (pl.DataFrame, optional): Pre-computed candidate
+                training data (default: None).
+            params (dict, optional): A dictionary with parameters to overwrite
+                model configuration.
 
         Returns:
             pl.DataFrame: The prepared training data.
         """
         # Check if pre-computed candidate training data is provided
+        # If not, generate candidate training data in batches
         if not train_candidates:
-            # If not, generate candidate training data in batches
-            # If n_jobs is 0, use parameter of EBM model; otherwise, use given number of jobs
-            if not n_jobs:
-                train_candidates = self.generate_candidates_batch(
-                    texts=texts,
-                    doc_ids=doc_ids,
-                )
-            else:
-                train_candidates = self.generate_candidates_batch(
-                    texts=texts,
-                    doc_ids=doc_ids,
-                    chunking_jobs=n_jobs,
-                    query_jobs=n_jobs,
-                )
+            train_candidates = self.generate_candidates_batch(
+                texts=texts, doc_ids=doc_ids, params=params
+            )
 
         # Create a gold standard data frame from the provided doc IDs and label IDs
         gold_standard = pl.DataFrame(
@@ -433,7 +450,7 @@ class EbmModel:
         )
 
     def generate_candidates(
-        self, text: str, doc_id: int, n_jobs: int = 0
+        self, text: str, doc_id: int, params: dict[str:Any] = {}
     ) -> pl.DataFrame:
         """
         Generates candidate labels for a given text and document ID.
@@ -444,43 +461,46 @@ class EbmModel:
         Args:
             text (str): The input text.
             doc_id (int): The document ID.
-            n_jobs (int, optional): The number of jobs to use for parallel
-                processing (default: 0).
+            params (dict, optional): A dictionary with parameters to overwrite
+                model configuration.
 
         Returns:
             pl.DataFrame: A DataFrame containing the generated candidate labels.
         """
         # process text if not empty
         if text:
-            # Check if n_jobs is provided, if not use number of jobs
-            # specified in model parameters
-            if not n_jobs:
-                n_jobs = self.query_jobs
-
             # Create a Chunker instance with specified parameters
             self.logger.info("chunking text")
             chunker = Chunker(
-                tokenizer=self.chunk_tokenizer,
-                max_chunk_count=self.max_chunk_count,
-                max_chunk_length=self.max_chunk_length,
-                max_sentence_count=self.max_sentence_count,
+                self.chunk_tokenizer,
+                int(params.get("max_chunk_count", self.max_chunk_count)),
+                int(params.get("max_chunk_length", self.max_chunk_length)),
+                int(params.get("max_sentence_count", self.max_sentence_count)),
             )
             # Chunk the input text
             text_chunks = chunker.chunk_text(text)
 
             # Initialize the generator
-            self._init_generator()
+            self._init_generator(params)
             self.logger.info("creating embeddings for text chunks")
+
+            # Parse the 'encode_args_documents' parameter
+            encode_args_documents = params.get(
+                "encode_args_documents", self.encode_args_documents
+            )
+            if isinstance(encode_args_documents, str) or not encode_args_documents:
+                encode_args_documents = (
+                    ast.literal_eval(encode_args_documents)
+                    if encode_args_documents
+                    else {}
+                )
+
             # Generate embeddings for the text chunks
             embeddings = self.generator.generate_embeddings(
                 # Use the text chunks as input
                 texts=text_chunks,
                 # Use the encode arguments for documents if provided
-                **(
-                    self.encode_args_documents
-                    if self.encode_args_documents is not None
-                    else {}
-                ),
+                **encode_args_documents,
             )
 
             # Create a query DataFrame
@@ -501,9 +521,10 @@ class EbmModel:
             )
 
             # Initialize the DuckDB client
-            self._init_duckdb_client()
+            self._init_duckdb_client(params)
+            query_jobs = int(params.get("query_jobs", self.query_jobs))
             self.logger.info(
-                f"running vector search and creating candidates with query_jobs: {n_jobs}"
+                f"running vector search and creating candidates with query_jobs: {query_jobs}"
             )
             # Perform vector search using the query DataFrame
             # Using the parameters specified for the EBM model
@@ -511,11 +532,13 @@ class EbmModel:
             candidates = self.client.vector_search(
                 query_df=query_df,
                 collection_name=self.collection_name,
-                embedding_dimensions=self.embedding_dimensions,
-                n_jobs=n_jobs,
-                n_hits=self.candidates_per_chunk,
+                embedding_dimensions=int(self.embedding_dimensions),
+                n_jobs=query_jobs,
+                n_hits=int(
+                    params.get("candidates_per_chunk", self.candidates_per_chunk)
+                ),
                 chunk_size=1024,
-                top_k=self.candidates_per_doc,
+                top_k=int(params.get("candidates_per_doc", self.candidates_per_doc)),
                 hnsw_metric_function="array_cosine_distance",
             )
 
@@ -557,8 +580,7 @@ class EbmModel:
         self,
         texts: list[str],
         doc_ids: list[int],
-        chunking_jobs: int = 0,
-        query_jobs: int = 0,
+        params: dict[str:Any] = {},
     ) -> pl.DataFrame:
         """
         Generates candidate labels for a batch of given texts and document IDs.
@@ -569,64 +591,62 @@ class EbmModel:
         Args:
             text (str): The input text.
             doc_id (int): The document ID.
-            chunking_jobs (int, optional): The number of jobs to use for parallel
-                chunking (default: 0).
-            query_jobs (int, optional): The number of jobs to use for parallel
-                querying (default: 0).
+            params (dict, optional): A dictionary with parameters to overwrite
+                model configuration.
 
         Returns:
             pl.DataFrame: A DataFrame containing the generated candidate labels.
         """
-        # Check if number of jobs are provided, if not use number of jobs
-        # specified in model parameters
-        if not chunking_jobs:
-            chunking_jobs = self.chunking_jobs
-        if not query_jobs:
-            query_jobs = self.query_jobs
-
         # Create a Chunker instance with specified parameters
         chunker = Chunker(
-            tokenizer=self.chunk_tokenizer,
-            max_chunk_count=self.max_chunk_count,
-            max_chunk_length=self.max_chunk_length,
-            max_sentence_count=self.max_sentence_count,
+            self.chunk_tokenizer,
+            int(params.get("max_chunk_count", self.max_chunk_count)),
+            int(params.get("max_chunk_length", self.max_chunk_length)),
+            int(params.get("max_sentence_count", self.max_sentence_count)),
         )
         # Chunk the input texts
+        chunking_jobs = int(params.get("chunking_jobs", self.chunking_jobs))
         self.logger.info(f"chunking texts with chunking_jobs: {chunking_jobs}")
         text_chunks, chunk_index = chunker.chunk_batches(texts, doc_ids, chunking_jobs)
 
+        # Parse the 'encode_args_documents' parameter
+        encode_args_documents = params.get(
+            "encode_args_documents", self.encode_args_documents
+        )
+        if isinstance(encode_args_documents, str) or not encode_args_documents:
+            encode_args_documents = (
+                ast.literal_eval(encode_args_documents) if encode_args_documents else {}
+            )
+
         # Initialize the generator and chunk index
-        self._init_generator()
+        self._init_generator(params)
         chunk_index = pl.concat(chunk_index).with_row_index("query_id")
         self.logger.info("creating embeddings for text chunks and query dataframe")
         embeddings = self.generator.generate_embeddings(
             texts=text_chunks,
-            **(
-                self.encode_args_documents
-                if self.encode_args_documents is not None
-                else {}
-            ),
+            **encode_args_documents,
         )
 
         # Initialize the DuckDB client
-        self._init_duckdb_client()
+        self._init_duckdb_client(params)
         # Extend chunk_index by a list column containing the embeddings
         query_df = chunk_index.with_columns(pl.Series("embeddings", embeddings))
 
         # Perform vector search using the query DataFrame
         # Using the parameters specified for the EBM model
         # and the optimal chunk size for the DuckDB
+        query_jobs = int(params.get("query_jobs", self.query_jobs))
         self.logger.info(
             f"running vector search and creating candidates with query_jobs: {query_jobs}"
         )
         candidates = self.client.vector_search(
             query_df=query_df,
             collection_name=self.collection_name,
-            embedding_dimensions=self.embedding_dimensions,
+            embedding_dimensions=int(self.embedding_dimensions),
             n_jobs=query_jobs,
-            n_hits=self.candidates_per_chunk,
+            n_hits=int(params.get("candidates_per_chunk", self.candidates_per_chunk)),
             chunk_size=1024,
-            top_k=self.candidates_per_doc,
+            top_k=int(params.get("candidates_per_doc", self.candidates_per_doc)),
             hnsw_metric_function="array_cosine_distance",
         )
 
@@ -676,7 +696,7 @@ class EbmModel:
         # Check if n_jobs is provided, if not use number of jobs
         # specified in model parameters
         if not n_jobs:
-            n_jobs = self.train_jobs
+            n_jobs = int(self.train_jobs)
 
         # Select the required columns from the train_data DataFrame,
         # convert to a numpy array and afterwards to training matrix
@@ -709,9 +729,11 @@ class EbmModel:
                 params={
                     "objective": "binary:logistic",  # Objective function to minimize
                     "eval_metric": "logloss",  # Evaluation metric
-                    "eta": self.train_shrinkage,  # Learning rate
-                    "max_depth": self.train_interaction_depth,  # Maximum tree depth
-                    "subsample": self.train_subsample,  # Sampling ratio
+                    "eta": float(self.train_shrinkage),  # Learning rate
+                    "max_depth": int(
+                        self.train_interaction_depth
+                    ),  # Maximum tree depth
+                    "subsample": float(self.train_subsample),  # Sampling ratio
                     "nthread": n_jobs,  # Number of threads to use
                 },
                 # Use the training matrix as the input data
@@ -721,7 +743,7 @@ class EbmModel:
                 # Evaluate the model on the training data
                 evals=[(matrix, "train")],
                 # Specify the number of boosting rounds
-                num_boost_round=self.train_rounds,
+                num_boost_round=int(self.train_rounds),
                 # Use the specified callbacks
                 callbacks=self.xgb_callbacks,
             )
@@ -797,7 +819,7 @@ class EbmModel:
             # Group the DataFrame by document ID and aggregate the top-k labels
             # and scores for each group
             .group_by("doc_id")
-            .agg(pl.all().head(self.candidates_per_doc))
+            .agg(pl.all().head(int(self.candidates_per_doc)))
             # Explode the aggregated DataFrame to create separate rows for each
             # label and score
             .explode(["label_id", "score"])
@@ -807,37 +829,21 @@ class EbmModel:
 
     def save(self, output_path: str) -> list[str]:
         """
-        Saves the current state of the EBM model to a file using joblib.
-
-        This method serializes the model instance and writes it to the
-        specified output path, allowing for later deserialization and
-        restoration of the model's state.
+        Saves the ranker of the EBM model to a file using joblib.
 
         Args:
-            output_path: The file path where the serialized model will be written.
+            output_path: The file path where the serialized ranker will be written to.
 
         Returns:
-            list[str]: Output path of model file.
-
-        Notes:
-            The model's client, generator and loggers are reset to None.
+            list[str]: Output path of file.
         """
-        self.client = None
-        self.generator = None
+        return joblib.dump(self.model, output_path)
 
-        self.init_logger()
-
-        return joblib.dump(self, output_path)
-
-    @staticmethod
-    def load(input_path: str) -> EbmModel:
+    def load(self, input_path: str) -> None:
         """
-        Loads an EBM model from a joblib serialized file.
+        Loads an EBM ranker model from a joblib serialized file.
 
         Args:
-            input_path (str): Path to the joblib serialized file containing the EBM model.
-
-        Returns:
-            EbmModel: The loaded EBM model instance.
+            input_path (str): Path to the joblib serialized file.
         """
-        return joblib.load(input_path)
+        self.model = joblib.load(input_path)
