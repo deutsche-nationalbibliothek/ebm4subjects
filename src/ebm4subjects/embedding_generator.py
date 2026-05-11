@@ -128,14 +128,21 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGenerator):
 
             # Check for which texts embeddings are saved if a cache is existing
             if self.redis_cache:
-                self.logger.debug("Checking for previous generated embeddings in cache")
-                cached_texts, new_texts = self.redis_cache.check_batch(texts)
+                self.logger.debug(
+                    f"Checking cache for previous generated embeddings for {len(batch_texts)} texts"
+                )
+                cached_texts, new_texts = self.redis_cache.check_batch(batch_texts)
                 if cached_texts:
-                    self.logger.debug("Retrieving previous generated embeddings from cache")
+                    self.logger.debug(
+                        f"Retrieving {len(cached_texts)} previous generated embeddings from cache"
+                    )
                     cached_embeddings = self.redis_cache.get_batch(cached_texts)
 
             # send a request to the HuggingFaceTEI API
             if new_texts:
+                self.logger.debug(
+                    f"Generating new embeddings for {len(new_texts)} texts"
+                )
                 data = {"inputs": new_texts, "truncate": True}
                 response = self.session.post(
                     self.api_address, headers=self.headers, json=data
@@ -147,7 +154,9 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGenerator):
 
                     # Store all generated embddings in cache if existing
                     if self.redis_cache:
-                        self.logger.debug("Storing generated embeddings in cache")
+                        self.logger.debug(
+                            f"Storing {len(generated_embeddings)} generated embeddings in cache"
+                        )
                         self.redis_cache.add_batch(new_texts, generated_embeddings)
 
                 # Retur 0's if call to API was not successful
@@ -258,15 +267,22 @@ class EmbeddingGeneratorOpenAI(EmbeddingGenerator):
 
             # Check for which texts embeddings are saved if a cache is existing
             if self.redis_cache:
-                self.logger.debug("Checking for previous generated embeddings in cache")
-                cached_texts, new_texts = self.redis_cache.check_batch(texts)
+                self.logger.debug(
+                    f"Checking cache for previous generated embeddings for {len(batch_texts)} texts"
+                )
+                cached_texts, new_texts = self.redis_cache.check_batch(batch_texts)
                 if cached_texts:
-                    self.logger.debug("Retrieving previous generated embeddings from cache")
+                    self.logger.debug(
+                        f"Retrieving {len(cached_texts)} previous generated embeddings from cache"
+                    )
                     cached_embeddings = self.redis_cache.get_batch(cached_texts)
 
             # Try to get embeddings for the (new texts ot the) batch from the API
             if new_texts:
                 try:
+                    self.logger.debug(
+                        f"Generating new embeddings for {len(new_texts)} texts"
+                    )
                     embedding_response = self.client.embeddings.create(
                         input=new_texts,
                         model=self.model_name,
@@ -282,7 +298,9 @@ class EmbeddingGeneratorOpenAI(EmbeddingGenerator):
 
                     # Store all generated embddings in cache if existing
                     if self.redis_cache:
-                        self.logger.debug("Storing generated embeddings in cache")
+                        self.logger.debug(
+                            f"Storing {len(generated_embeddings)} generated embeddings in cache"
+                        )
                         self.redis_cache.add_batch(new_texts, generated_embeddings)
 
                 # Retur 0's if call to API was not successful
@@ -381,19 +399,26 @@ class EmbeddingGeneratorInProcess(EmbeddingGenerator):
 
         # Check for which texts embeddings are saved if a cache is existing
         if self.redis_cache:
-            self.logger.debug("Checking for previous generated embeddings in cache")
+            self.logger.debug(
+                f"Checking cache for previous generated embeddings for {len(texts)} texts"
+            )
             cached_texts, new_texts = self.redis_cache.check_batch(texts)
             if cached_texts:
-                self.logger.debug("Retrieving previous generated embeddings from cache")
+                self.logger.debug(
+                    f"Retrieving {len(cached_texts)} previous generated embeddings from cache"
+                )
                 cached_embeddings = self.redis_cache.get_batch(cached_texts)
 
         if new_texts:
             # Generate embeddings using the SentenceTransformer model
+            self.logger.debug(f"Generating new embeddings for {len(new_texts)} texts")
             generated_embeddings = self.model.encode(new_texts, **kwargs)
 
             # Store all generated embddings in cache if existing
             if self.redis_cache:
-                self.logger.debug("Storing generated embeddings in cache")
+                self.logger.debug(
+                    f"Storing {len(generated_embeddings)} generated embeddings in cache"
+                )
                 self.redis_cache.add_batch(new_texts, generated_embeddings)
 
         # Combine list of cached and generated embeddings into return list
