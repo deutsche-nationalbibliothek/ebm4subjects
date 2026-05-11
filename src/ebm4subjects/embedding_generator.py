@@ -4,6 +4,7 @@ import os
 import numpy as np
 import requests
 from openai import BadRequestError, NotFoundError, OpenAI
+from redisvl.extensions.cache.embeddings import EmbeddingsCache
 from tqdm import tqdm
 
 
@@ -43,6 +44,7 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGenerator):
         model_name: str,
         embedding_dimensions: int,
         logger: logging.Logger,
+        cache_url: str = "",
         **kwargs,
     ) -> None:
         """
@@ -55,6 +57,7 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGenerator):
             model_name (str): The name of the SentenceTransformer model.
             embedding_dimensions (int): The dimensionality of the generated embeddings.
             logger (Logger): A logger for the embedding generator.
+            cache_url (str, optional): URL to a cache to save generated embeddings.
             **kwargs: Additional keyword arguments to pass to the model.
         """
 
@@ -63,6 +66,13 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGenerator):
         self.session = requests.Session()
         self.api_address = kwargs.get("api_address")
         self.headers = kwargs.get("headers", {"Content-Type": "application/json"})
+
+        self.redis_cache = None
+        if cache_url:
+            self.redis_cache = RedisCacheConnector(
+                model_name=self.model_name,
+                cache_url=cache_url,
+            )
 
         self.logger = logger
         self._test_api()
@@ -111,19 +121,47 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGenerator):
 
         for i in tqdm(range(0, len(texts), batch_size), desc="Processing batches"):
             batch_texts = texts[i : i + batch_size]
-            # send a request to the HuggingFaceTEI API
-            data = {"inputs": batch_texts, "truncate": True}
-            response = self.session.post(
-                self.api_address, headers=self.headers, json=data
-            )
 
-            # add generated embeddings to return list if request was successful
-            if response.status_code == 200:
-                embeddings.extend(response.json())
-            else:
-                self.logger.warning("Call to API NOT successful! Returning 0's.")
-                for _ in batch_texts:
-                    embeddings.append([0 for _ in range(self.embedding_dimensions)])
+            cached_texts = []
+            new_texts = batch_texts
+            generated_embeddings = []
+
+            # Check for which texts embeddings are saved if a cache is existing
+            if self.redis_cache:
+                self.logger.debug("Retrieving previous generated embeddings from cache")
+                cached_texts, new_texts = self.redis_cache.check_batch(batch_texts)
+                cached_embeddings = self.redis_cache.get_batch(cached_texts)
+
+            # send a request to the HuggingFaceTEI API
+            if new_texts:
+                data = {"inputs": new_texts, "truncate": True}
+                response = self.session.post(
+                    self.api_address, headers=self.headers, json=data
+                )
+
+                # Add generated embeddings to return list if request was successful
+                if response.status_code == 200:
+                    generated_embeddings = response.json()
+
+                    # Store all generated embddings in cache if existing
+                    if self.redis_cache:
+                        self.logger.debug("Storing generated embeddings in cache")
+                        self.redis_cache.add_batch(new_texts, generated_embeddings)
+
+                # Retur 0's if call to API was not successful
+                else:
+                    self.logger.warning("Call to API NOT successful! Returning 0's.")
+                    for _ in batch_texts:
+                        generated_embeddings.append(
+                            [0 for _ in range(self.embedding_dimensions)]
+                        )
+
+            # Combine list of cached and generated embeddings into return list
+            for text in batch_texts:
+                if text in cached_texts:
+                    embeddings.append(cached_embeddings[cached_texts.index(text)])
+                if text in new_texts:
+                    embeddings.append(generated_embeddings[new_texts.index(text)])
 
         return np.array(embeddings)
 
@@ -138,6 +176,7 @@ class EmbeddingGeneratorOpenAI(EmbeddingGenerator):
         model_name: str,
         embedding_dimensions: int,
         logger: logging.Logger,
+        cache_url: str = "",
         **kwargs,
     ) -> None:
         """
@@ -149,6 +188,7 @@ class EmbeddingGeneratorOpenAI(EmbeddingGenerator):
         Args:
             model_name (str): The name of the SentenceTransformer model.
             embedding_dimensions (int): The dimensionality of the generated embeddings.
+            cache_url (str, optional): URL to a cache to save generated embeddings.
             logger (Logger): A logger for the embedding generator.
             **kwargs: Additional keyword arguments to pass to the model.
         """
@@ -160,6 +200,13 @@ class EmbeddingGeneratorOpenAI(EmbeddingGenerator):
             api_key = ""
 
         self.client = OpenAI(api_key=api_key, base_url=kwargs.get("api_address"))
+
+        self.redis_cache = None
+        if cache_url:
+            self.redis_cache = RedisCacheConnector(
+                model_name=self.model_name,
+                cache_url=cache_url,
+            )
 
         self.logger = logger
         self._test_api()
@@ -203,22 +250,51 @@ class EmbeddingGeneratorOpenAI(EmbeddingGenerator):
         for i in tqdm(range(0, len(texts), batch_size), desc="Processing batches"):
             batch_texts = texts[i : i + batch_size]
 
-            # Try to get embeddings for the batch from the API
-            try:
-                embedding_response = self.client.embeddings.create(
-                    input=batch_texts,
-                    model=self.model_name,
-                    encoding_format="float",
-                    extra_body={**kwargs},
-                )
+            cached_texts = []
+            new_texts = batch_texts
+            generated_embeddings = []
 
-                # Process all embeddings from the batch response
-                for i, _ in enumerate(batch_texts):
-                    embeddings.append(embedding_response.data[i].embedding)
-            except (NotFoundError, BadRequestError):
-                self.logger.warning("Call to API NOT successful! Returning 0's.")
-                for _ in batch_texts:
-                    embeddings.append([0 for _ in range(self.embedding_dimensions)])
+            # Check for which texts embeddings are saved if a cache is existing
+            if self.redis_cache:
+                self.logger.debug("Retrieving previous generated embeddings from cache")
+                cached_texts, new_texts = self.redis_cache.check_batch(batch_texts)
+                cached_embeddings = self.redis_cache.get_batch(cached_texts)
+
+            # Try to get embeddings for the (new texts ot the) batch from the API
+            if new_texts:
+                try:
+                    embedding_response = self.client.embeddings.create(
+                        input=new_texts,
+                        model=self.model_name,
+                        encoding_format="float",
+                        extra_body={**kwargs},
+                    )
+
+                    # Process all embeddings from the batch response
+                    for i, _ in enumerate(new_texts):
+                        generated_embeddings.append(
+                            embedding_response.data[i].embedding
+                        )
+
+                    # Store all generated embddings in cache if existing
+                    if self.redis_cache:
+                        self.logger.debug("Storing generated embeddings in cache")
+                        self.redis_cache.add_batch(new_texts, generated_embeddings)
+
+                # Retur 0's if call to API was not successful
+                except (NotFoundError, BadRequestError):
+                    self.logger.warning("Call to API NOT successful! Returning 0's.")
+                    for _ in new_texts:
+                        generated_embeddings.append(
+                            [0 for _ in range(self.embedding_dimensions)]
+                        )
+
+            # Combine list of cached and generated embeddings into return list
+            for text in batch_texts:
+                if text in cached_texts:
+                    embeddings.append(cached_embeddings[cached_texts.index(text)])
+                if text in new_texts:
+                    embeddings.append(generated_embeddings[new_texts.index(text)])
 
         return np.array(embeddings)
 
@@ -227,12 +303,6 @@ class EmbeddingGeneratorInProcess(EmbeddingGenerator):
     """
     A class for generating embeddings using a given SentenceTransformer model
     loaded in-process with SentenceTransformer.
-
-    Args:
-        model_name (str): The name of the SentenceTransformer model.
-        embedding_dimensions (int): The dimensionality of the generated embeddings.
-        logger (Logger): A logger for the embedding generator.
-        **kwargs: Additional keyword arguments to pass to the model.
     """
 
     def __init__(
@@ -240,6 +310,7 @@ class EmbeddingGeneratorInProcess(EmbeddingGenerator):
         model_name: str,
         embedding_dimensions: int,
         logger: logging.Logger,
+        cache_url: str = "",
         **kwargs,
     ) -> None:
         """
@@ -247,6 +318,13 @@ class EmbeddingGeneratorInProcess(EmbeddingGenerator):
 
         Sets the model name, embedding dimensions, and creates a
         SentenceTransformer model instance.
+
+        Args:
+            model_name (str): The name of the SentenceTransformer model.
+            embedding_dimensions (int): The dimensionality of the generated embeddings.
+            logger (Logger): A logger for the embedding generator.
+            cache_url (str, optional): URL to a cache to save generated embeddings.
+            **kwargs: Additional keyword arguments to pass to the model.
         """
         from sentence_transformers import SentenceTransformer
 
@@ -258,6 +336,14 @@ class EmbeddingGeneratorInProcess(EmbeddingGenerator):
         self.model = SentenceTransformer(
             model_name, truncate_dim=embedding_dimensions, **kwargs
         )
+
+        self.redis_cache = None
+        if cache_url:
+            self.redis_cache = RedisCacheConnector(
+                model_name=self.model_name,
+                cache_url=cache_url,
+            )
+
         self.logger = logger
         self.logger.debug(f"SentenceTransformer model running on {self.model.device}")
 
@@ -280,13 +366,38 @@ class EmbeddingGeneratorInProcess(EmbeddingGenerator):
             np.ndarray: A numpy array of shape (len(texts), embedding_dimensions)
                 containing the generated embeddings.
         """
-        # Check if the input list is empty
+        # If input list is empty, return an empty numpy array with the correct shape
         if not texts:
-            # If empty, return an empty numpy array with the correct shape
             return np.empty((0, self.embedding_dimensions))
 
-        # Generate embeddings using the SentenceTransformer model and return them
-        return self.model.encode(texts, **kwargs)
+        embeddings = []
+        cached_texts = []
+        new_texts = texts
+        generated_embeddings = []
+
+        # Check for which texts embeddings are saved if a cache is existing
+        if self.redis_cache:
+            self.logger.debug("Retrieving previous generated embeddings from cache")
+            cached_texts, new_texts = self.redis_cache.check_batch(texts)
+            cached_embeddings = self.redis_cache.get_batch(cached_texts)
+
+        if new_texts:
+            # Generate embeddings using the SentenceTransformer model
+            generated_embeddings = self.model.encode(new_texts, **kwargs)
+
+            # Store all generated embddings in cache if existing
+            if self.redis_cache:
+                self.logger.debug("Storing generated embeddings in cache")
+                self.redis_cache.add_batch(new_texts, generated_embeddings)
+
+        # Combine list of cached and generated embeddings into return list
+        for text in texts:
+            if text in cached_texts:
+                embeddings.append(cached_embeddings[cached_texts.index(text)])
+            if text in new_texts:
+                embeddings.append(generated_embeddings[new_texts.index(text)])
+
+        return np.array(embeddings)
 
 
 class EmbeddingGeneratorMock(EmbeddingGenerator):
@@ -328,3 +439,84 @@ class EmbeddingGeneratorMock(EmbeddingGenerator):
 
         # Generate mock embeddings return them
         return np.ones((len(texts), 1024))
+
+
+class RedisCacheConnector:
+    def __init__(
+        self,
+        model_name: str,
+        cache_url: str = "redis://localhost:6379",
+    ) -> None:
+        """
+        Initializes the connection to the set up redis cache.
+
+        Args:
+            model_name (str): The name of the SentenceTransformer model.
+            cache_url (str): The URL to the set up redis cache.
+        """
+        self.model_name = model_name
+        self.cache = EmbeddingsCache(redis_url=cache_url)
+
+    def add_batch(
+        self,
+        texts: list[str],
+        embeddings: list[np.ndarray],
+    ) -> list[str]:
+        """
+        Adds a list of texts together with generated embeddings to the cache.
+
+        Args:
+            texts (list[str]): A list of input texts.
+            embeddings (list[np.ndarray]): A list of corresponding embeddings.
+
+        Returns:
+            list[str]: A list of status reports.
+        """
+        # Generate list of items with model name, text and embedding
+        batch_items = [
+            {
+                "content": texts[i],
+                "model_name": self.model_name,
+                "embedding": embeddings[i],
+            }
+            for i in range(len(texts))
+        ]
+
+        # Add items to cache
+        keys = self.cache.mset(batch_items)
+        return keys
+
+    def check_batch(self, texts: list[str]) -> tuple[list[str], list[str]]:
+        """
+        Check for list of texts if there are already generated embeddings in the cache.
+
+        Args:
+            texts (list[str]): A list of input texts.
+
+        Returns:
+            tuple[list[str], list[str]]: A list of text that are already in the cache
+                and a list of texts that are not in the cache
+        """
+        # Check which texts are already saved in the cache
+        exist_results = self.cache.mexists(texts, self.model_name)
+
+        # Split input list in list of already saved and unseen texts
+        cached_texts = [text for i, text in enumerate(texts) if exist_results[i]]
+        new_texts = [text for i, text in enumerate(texts) if not exist_results[i]]
+
+        return cached_texts, new_texts
+
+    def get_batch(self, texts: list[str]) -> list[list[float]]:
+        """
+        Get embeddings for list of texts from cache.
+
+        Args:
+            texts (list[str]): A list of input texts.
+
+        Returns:
+            list[list[float]]: A list of embeddings saved for the input texts.
+        """
+        # Get saved embeddings for the list of texts
+        results = self.cache.mget(texts, self.model_name)
+
+        return [result["embedding"] for result in results]

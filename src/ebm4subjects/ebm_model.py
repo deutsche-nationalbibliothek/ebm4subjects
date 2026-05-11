@@ -43,11 +43,12 @@ class EbmModel:
         collection_name: str = "my_collection",
         use_altLabels: bool = True,
         hnsw_index_params: dict | str | None = None,
-        embedding_model_name: str | None = None,
+        embedding_model_name: str | None = "my_model",
         embedding_model_deployment: str = "mock",
         embedding_model_args: dict | str | None = None,
         encode_args_vocab: dict | str | None = None,
         encode_args_documents: dict | str | None = None,
+        cache_url: str = "",
         log_path: str | None = None,
         logger: logging.Logger | None = None,
         logging_level: str = "info",
@@ -104,6 +105,9 @@ class EbmModel:
         self.embedding_model_args = embedding_model_args
         self.encode_args_vocab = encode_args_vocab
         self.encode_args_documents = encode_args_documents
+
+        # Parameter for embedding cache
+        self.cache_url = cache_url
 
         # Parameters for chunker
         self.chunk_tokenizer = chunk_tokenizer
@@ -204,6 +208,7 @@ class EbmModel:
                     model_name=model_name,
                     embedding_dimensions=embedding_dimensions,
                     logger=self.logger,
+                    cache_url=self.cache_url,
                     **embedding_model_args,
                 )
             elif embedding_model_deployment == "mock":
@@ -215,6 +220,7 @@ class EbmModel:
                     model_name=model_name,
                     embedding_dimensions=embedding_dimensions,
                     logger=self.logger,
+                    cache_url=self.cache_url,
                     **embedding_model_args,
                 )
             elif embedding_model_deployment == "openai":
@@ -223,6 +229,7 @@ class EbmModel:
                     model_name=model_name,
                     embedding_dimensions=embedding_dimensions,
                     logger=self.logger,
+                    cache_url=self.cache_url,
                     **embedding_model_args,
                 )
             else:
