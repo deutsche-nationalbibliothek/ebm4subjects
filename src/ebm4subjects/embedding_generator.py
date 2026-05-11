@@ -3,7 +3,7 @@ import os
 
 import numpy as np
 import requests
-from openai import BadRequestError, NotFoundError, OpenAI
+from openai import OpenAI, OpenAIError
 from redisvl.extensions.cache.embeddings import EmbeddingsCache
 from tqdm import tqdm
 
@@ -286,7 +286,7 @@ class EmbeddingGeneratorOpenAI(EmbeddingGenerator):
                         self.redis_cache.add_batch(new_texts, generated_embeddings)
 
                 # Retur 0's if call to API was not successful
-                except (NotFoundError, BadRequestError):
+                except OpenAIError:
                     self.logger.warning("Call to API NOT successful! Returning 0's.")
                     for _ in new_texts:
                         generated_embeddings.append(
