@@ -128,9 +128,11 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGenerator):
 
             # Check for which texts embeddings are saved if a cache is existing
             if self.redis_cache:
-                self.logger.debug("Retrieving previous generated embeddings from cache")
-                cached_texts, new_texts = self.redis_cache.check_batch(batch_texts)
-                cached_embeddings = self.redis_cache.get_batch(cached_texts)
+                self.logger.debug("Checking for previous generated embeddings in cache")
+                cached_texts, new_texts = self.redis_cache.check_batch(texts)
+                if cached_texts:
+                    self.logger.debug("Retrieving previous generated embeddings from cache")
+                    cached_embeddings = self.redis_cache.get_batch(cached_texts)
 
             # send a request to the HuggingFaceTEI API
             if new_texts:
@@ -256,9 +258,11 @@ class EmbeddingGeneratorOpenAI(EmbeddingGenerator):
 
             # Check for which texts embeddings are saved if a cache is existing
             if self.redis_cache:
-                self.logger.debug("Retrieving previous generated embeddings from cache")
-                cached_texts, new_texts = self.redis_cache.check_batch(batch_texts)
-                cached_embeddings = self.redis_cache.get_batch(cached_texts)
+                self.logger.debug("Checking for previous generated embeddings in cache")
+                cached_texts, new_texts = self.redis_cache.check_batch(texts)
+                if cached_texts:
+                    self.logger.debug("Retrieving previous generated embeddings from cache")
+                    cached_embeddings = self.redis_cache.get_batch(cached_texts)
 
             # Try to get embeddings for the (new texts ot the) batch from the API
             if new_texts:
@@ -377,9 +381,11 @@ class EmbeddingGeneratorInProcess(EmbeddingGenerator):
 
         # Check for which texts embeddings are saved if a cache is existing
         if self.redis_cache:
-            self.logger.debug("Retrieving previous generated embeddings from cache")
+            self.logger.debug("Checking for previous generated embeddings in cache")
             cached_texts, new_texts = self.redis_cache.check_batch(texts)
-            cached_embeddings = self.redis_cache.get_batch(cached_texts)
+            if cached_texts:
+                self.logger.debug("Retrieving previous generated embeddings from cache")
+                cached_embeddings = self.redis_cache.get_batch(cached_texts)
 
         if new_texts:
             # Generate embeddings using the SentenceTransformer model
