@@ -191,6 +191,12 @@ class EbmModel:
             "embedding_model_deployment", self.embedding_model_deployment
         ).lower()
         model_name = self.embedding_model_name
+        if self.embedding_cache_url and self.embedding_model_name is None:
+            raise ValueError(
+                "embedding_cache_url is set but embedding_model_name is None. "
+            )
+
+
         embedding_dimensions = int(self.embedding_dimensions)
         embedding_model_args = params.get(
             "embedding_model_args", self.embedding_model_args
