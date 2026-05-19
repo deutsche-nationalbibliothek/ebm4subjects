@@ -45,6 +45,7 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGenerator):
         embedding_dimensions: int,
         logger: logging.Logger,
         cache_url: str = "",
+        cache_ttl: int = None,
         **kwargs,
     ) -> None:
         """
@@ -57,7 +58,8 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGenerator):
             model_name (str): The name of the SentenceTransformer model.
             embedding_dimensions (int): The dimensionality of the generated embeddings.
             logger (Logger): A logger for the embedding generator.
-            cache_url (str, optional): URL to a cache to save generated embeddings.
+            cache_url (str, optional): URL to a redis cache to save generated embeddings.
+            cache_ttl (int, optional): Expiration time for cached embeddings.
             **kwargs: Additional keyword arguments to pass to the model.
         """
 
@@ -72,6 +74,7 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGenerator):
             self.redis_cache = RedisCacheConnector(
                 model_name=self.model_name,
                 cache_url=cache_url,
+                cache_ttl=cache_ttl,
             )
 
         self.logger = logger
@@ -188,6 +191,7 @@ class EmbeddingGeneratorOpenAI(EmbeddingGenerator):
         embedding_dimensions: int,
         logger: logging.Logger,
         cache_url: str = "",
+        cache_ttl: int = None,
         **kwargs,
     ) -> None:
         """
@@ -200,6 +204,7 @@ class EmbeddingGeneratorOpenAI(EmbeddingGenerator):
             model_name (str): The name of the SentenceTransformer model.
             embedding_dimensions (int): The dimensionality of the generated embeddings.
             cache_url (str, optional): URL to a cache to save generated embeddings.
+            cache_ttl (int, optional): Expiration time for cached embeddings.
             logger (Logger): A logger for the embedding generator.
             **kwargs: Additional keyword arguments to pass to the model.
         """
@@ -217,6 +222,7 @@ class EmbeddingGeneratorOpenAI(EmbeddingGenerator):
             self.redis_cache = RedisCacheConnector(
                 model_name=self.model_name,
                 cache_url=cache_url,
+                cache_ttl=cache_ttl,
             )
 
         self.logger = logger
@@ -333,6 +339,7 @@ class EmbeddingGeneratorInProcess(EmbeddingGenerator):
         embedding_dimensions: int,
         logger: logging.Logger,
         cache_url: str = "",
+        cache_ttl: int = None,
         **kwargs,
     ) -> None:
         """
@@ -346,6 +353,7 @@ class EmbeddingGeneratorInProcess(EmbeddingGenerator):
             embedding_dimensions (int): The dimensionality of the generated embeddings.
             logger (Logger): A logger for the embedding generator.
             cache_url (str, optional): URL to a cache to save generated embeddings.
+            cache_ttl (int, optional): Expiration time for cached embeddings.
             **kwargs: Additional keyword arguments to pass to the model.
         """
         from sentence_transformers import SentenceTransformer
@@ -364,6 +372,7 @@ class EmbeddingGeneratorInProcess(EmbeddingGenerator):
             self.redis_cache = RedisCacheConnector(
                 model_name=self.model_name,
                 cache_url=cache_url,
+                cache_ttl=cache_ttl,
             )
 
         self.logger = logger
@@ -477,6 +486,7 @@ class RedisCacheConnector:
         self,
         model_name: str,
         cache_url: str = "redis://localhost:6379",
+        cache_ttl: int = None
     ) -> None:
         """
         Initializes the connection to the set up redis cache.
@@ -484,9 +494,13 @@ class RedisCacheConnector:
         Args:
             model_name (str): The name of the SentenceTransformer model.
             cache_url (str): The URL to the set up redis cache.
+            cache_ttl (int): Time-To-Live for cached embeddings in seconds.
         """
         self.model_name = model_name
-        self.cache = EmbeddingsCache(redis_url=cache_url)
+        self.cache = EmbeddingsCache(
+            redis_url=cache_url,
+            ttl=cache_ttl
+        )
 
     def add_batch(
         self,
