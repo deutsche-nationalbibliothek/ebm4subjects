@@ -171,11 +171,14 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGenerator):
                         )
 
             # Combine list of cached and generated embeddings into return list
-            for text in batch_texts:
-                if text in cached_texts:
-                    embeddings.append(cached_embeddings[cached_texts.index(text)])
-                if text in new_texts:
-                    embeddings.append(generated_embeddings[new_texts.index(text)])
+            batch_embeddings = self.redis_cache.merge_embeddings(
+                texts=batch_texts,
+                new_texts=new_texts,
+                cached_texts=cached_texts,
+                generated_embeddings=generated_embeddings,
+                cached_embeddings=cached_embeddings,
+             )
+            embeddings.append(batch_embeddings)
 
         return np.array(embeddings)
 
@@ -318,12 +321,15 @@ class EmbeddingGeneratorOpenAI(EmbeddingGenerator):
                         )
 
             # Combine list of cached and generated embeddings into return list
-            for text in batch_texts:
-                if text in cached_texts:
-                    embeddings.append(cached_embeddings[cached_texts.index(text)])
-                if text in new_texts:
-                    embeddings.append(generated_embeddings[new_texts.index(text)])
-
+            batch_embeddings = self.redis_cache.merge_embeddings(
+                texts=batch_texts,
+                new_texts=new_texts,
+                cached_texts=cached_texts,
+                generated_embeddings=generated_embeddings,
+                cached_embeddings=cached_embeddings,
+             )
+            embeddings.append(batch_embeddings)
+                
         return np.array(embeddings)
 
 
@@ -416,7 +422,16 @@ class EmbeddingGeneratorInProcess(EmbeddingGenerator):
                 self.logger.debug(
                     f"Retrieving {len(cached_texts)} previous generated embeddings from cache"
                 )
-                cached_embeddings = self.redis_cache.get_batch(cached_texts)
+
+                # Split cached_texts into batches and call get_batch in a loop
+                cached_embeddings = []
+                cache_batch_size = 1024  # Use a reasonable batch size for cache retrieval
+                for j in tqdm(range(0, len(cached_texts), cache_batch_size), "Retrieving embeddings..."):
+                    batch_cached_texts = cached_texts[j : j + cache_batch_size]
+                    batch_cached_embeddings = self.redis_cache.get_batch(batch_cached_texts)
+                    cached_embeddings.extend(batch_cached_embeddings)
+            else:
+                cached_embeddings = []
 
         if new_texts:
             # Generate embeddings using the SentenceTransformer model
@@ -431,14 +446,15 @@ class EmbeddingGeneratorInProcess(EmbeddingGenerator):
                 self.redis_cache.add_batch(new_texts, generated_embeddings)
 
         # Combine list of cached and generated embeddings into return list
-        for text in texts:
-            if text in cached_texts:
-                embeddings.append(cached_embeddings[cached_texts.index(text)])
-            if text in new_texts:
-                embeddings.append(generated_embeddings[new_texts.index(text)])
-
-        return np.array(embeddings)
-
+        self.logger.debug(f"Combine cached and new embeddings")
+        return self.redis_cache.merge_embeddings(
+            texts=texts,
+            new_texts=new_texts,
+            cached_texts=cached_texts,
+            generated_embeddings=generated_embeddings,
+            cached_embeddings=cached_embeddings,
+             )
+      
 
 class EmbeddingGeneratorMock(EmbeddingGenerator):
     """
@@ -565,3 +581,24 @@ class RedisCacheConnector:
         results = self.cache.mget(texts, self.model_name)
 
         return [result["embedding"] for result in results]
+
+    def merge_embeddings(
+            self, 
+            texts: list[str],
+            cached_texts: list[str],
+            new_texts: list[str],
+            cached_embeddings: np.ndarray,
+            generated_embeddings: np.ndarray
+            ):
+        # Create lookup dictionaries
+        cached_lookup = {text: idx for idx, text in enumerate(cached_texts)}
+        new_lookup = {text: idx for idx, text in enumerate(new_texts)}
+
+        # Pre-allocate embeddings list
+        embeddings = []
+        for text in texts:
+            if text in cached_lookup:
+                embeddings.append(cached_embeddings[cached_lookup[text]])
+            elif text in new_lookup:
+                embeddings.append(generated_embeddings[new_lookup[text]])
+        return np.array(embeddings)
