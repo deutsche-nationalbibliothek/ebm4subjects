@@ -132,7 +132,7 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGenerator):
             # Check for which texts embeddings are saved if a cache is existing
             if self.redis_cache:
                 self.logger.debug(
-                    f"Checking cache for previous generated embeddings for {len(batch_texts)} texts"
+                    f"Checking cache for previously generated embeddings for {len(batch_texts)} texts"
                 )
                 cached_texts, new_texts = self.redis_cache.check_batch(batch_texts)
                 if cached_texts:
@@ -277,7 +277,7 @@ class EmbeddingGeneratorOpenAI(EmbeddingGenerator):
             # Check for which texts embeddings are saved if a cache is existing
             if self.redis_cache:
                 self.logger.debug(
-                    f"Checking cache for previous generated embeddings for {len(batch_texts)} texts"
+                    f"Checking cache for previously generated embeddings for {len(batch_texts)} texts"
                 )
                 cached_texts, new_texts = self.redis_cache.check_batch(batch_texts)
                 if cached_texts:
@@ -415,7 +415,7 @@ class EmbeddingGeneratorInProcess(EmbeddingGenerator):
         # Check for which texts embeddings are saved if a cache is existing
         if self.redis_cache:
             self.logger.debug(
-                f"Checking cache for previous generated embeddings for {len(texts)} texts"
+                f"Checking cache for previously generated embeddings for {len(texts)} texts"
             )
             cached_texts, new_texts = self.redis_cache.check_batch(texts)
             if cached_texts:
@@ -443,7 +443,13 @@ class EmbeddingGeneratorInProcess(EmbeddingGenerator):
                 self.logger.debug(
                     f"Storing {len(generated_embeddings)} generated embeddings in cache"
                 )
-                self.redis_cache.add_batch(new_texts, generated_embeddings)
+          
+                # Split into batches and call add_batch in a loop
+                cache_batch_size = 1024  # Use a reasonable batch size for cache storage
+                for j in tqdm(range(0, len(new_texts), cache_batch_size), "Storing newly generated embeddings in cache..."):
+                    batch_new_texts = new_texts[j : j + cache_batch_size]
+                    batch_generated_embeddings = generated_embeddings[j : j + cache_batch_size]
+                    self.redis_cache.add_batch(batch_new_texts, batch_generated_embeddings)
 
         # Combine list of cached and generated embeddings into return list
         self.logger.debug(f"Combine cached and new embeddings")
