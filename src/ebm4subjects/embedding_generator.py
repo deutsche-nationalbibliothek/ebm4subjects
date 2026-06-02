@@ -126,6 +126,7 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGenerator):
             batch_texts = texts[i : i + batch_size]
 
             cached_texts = []
+            cached_embeddings = []
             new_texts = batch_texts
             generated_embeddings = []
 
@@ -271,6 +272,7 @@ class EmbeddingGeneratorOpenAI(EmbeddingGenerator):
             batch_texts = texts[i : i + batch_size]
 
             cached_texts = []
+            cached_embeddings = []
             new_texts = batch_texts
             generated_embeddings = []
 
@@ -409,6 +411,7 @@ class EmbeddingGeneratorInProcess(EmbeddingGenerator):
 
         embeddings = []
         cached_texts = []
+        cached_embeddings = []
         new_texts = texts
         generated_embeddings = []
 
