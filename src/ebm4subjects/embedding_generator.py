@@ -112,7 +112,7 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGenerator):
                 containing the generated embeddings.
         """
         # prepare list for return
-        embeddings = []
+        chunks = []
 
         # Check if the input list is empty
         if not texts:
@@ -179,9 +179,12 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGenerator):
                 generated_embeddings=generated_embeddings,
                 cached_embeddings=cached_embeddings,
              )
-            embeddings.append(batch_embeddings)
+            chunks.append(batch_embeddings)
 
-        return np.array(embeddings)
+        if not chunks:
+            return np.empty((0, self.embedding_dimensions), dtype=np.float32)
+
+        return np.concatenate(chunks, axis=0).astype(np.float32, copy=False)
 
 
 class EmbeddingGeneratorOpenAI(EmbeddingGenerator):
@@ -257,7 +260,7 @@ class EmbeddingGeneratorOpenAI(EmbeddingGenerator):
                 containing the generated embeddings.
         """
         # prepare list for return
-        embeddings = []
+        chunks = []
 
         # Check if the input list is empty
         if not texts:
@@ -266,7 +269,7 @@ class EmbeddingGeneratorOpenAI(EmbeddingGenerator):
 
         # Process in smaller batches to avoid memory overload
         batch_size = min(200, len(texts))
-        embeddings = []
+        chunks = []
 
         for i in tqdm(range(0, len(texts), batch_size), desc="Processing batches"):
             batch_texts = texts[i : i + batch_size]
@@ -322,17 +325,12 @@ class EmbeddingGeneratorOpenAI(EmbeddingGenerator):
                             [0 for _ in range(self.embedding_dimensions)]
                         )
 
-            # Combine list of cached and generated embeddings into return list
-            batch_embeddings = self.redis_cache.merge_embeddings(
-                texts=batch_texts,
-                new_texts=new_texts,
-                cached_texts=cached_texts,
-                generated_embeddings=generated_embeddings,
-                cached_embeddings=cached_embeddings,
-             )
-            embeddings.append(batch_embeddings)
-                
-        return np.array(embeddings)
+                chunks.append(batch_embeddings)
+
+        if not chunks:
+            return np.empty((0, self.embedding_dimensions), dtype=np.float32)
+
+        return np.concatenate(chunks, axis=0).astype(np.float32, copy=False)
 
 
 class EmbeddingGeneratorInProcess(EmbeddingGenerator):
