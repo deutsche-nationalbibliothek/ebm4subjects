@@ -6,6 +6,7 @@ import requests
 from openai import OpenAI, OpenAIError
 from redisvl.extensions.cache.embeddings import EmbeddingsCache
 from tqdm import tqdm
+from tqdm.contrib.logging import logging_redirect_tqdm
 
 
 class EmbeddingGenerator:
@@ -135,12 +136,13 @@ class EmbeddingGeneratorHuggingFaceTEI(EmbeddingGenerator):
                 self.logger.debug(
                     f"Checking cache for previously generated embeddings for {len(batch_texts)} texts"
                 )
-                cached_texts, new_texts = self.redis_cache.check_batch(batch_texts)
+                cached_texts, new_texts, cached_embeddings = (
+                    self.redis_cache.get_cached_and_new_batch(batch_texts)
+                )
                 if cached_texts:
                     self.logger.debug(
-                        f"Retrieving {len(cached_texts)} previous generated embeddings from cache"
+                        f"Retrieved {len(cached_texts)} previously generated embeddings from cache"
                     )
-                    cached_embeddings = self.redis_cache.get_batch(cached_texts)
 
             # send a request to the HuggingFaceTEI API
             if new_texts:
@@ -271,60 +273,70 @@ class EmbeddingGeneratorOpenAI(EmbeddingGenerator):
         batch_size = min(200, len(texts))
         chunks = []
 
-        for i in tqdm(range(0, len(texts), batch_size), desc="Processing batches"):
-            batch_texts = texts[i : i + batch_size]
+        with logging_redirect_tqdm():
+            for i in tqdm(range(0, len(texts), batch_size), desc="Processing batches"):
+                batch_texts = texts[i : i + batch_size]
 
-            cached_texts = []
-            cached_embeddings = []
-            new_texts = batch_texts
-            generated_embeddings = []
+                cached_texts = []
+                cached_embeddings = []
+                new_texts = batch_texts
+                generated_embeddings = []
 
-            # Check for which texts embeddings are saved if a cache is existing
-            if self.redis_cache:
-                self.logger.debug(
-                    f"Checking cache for previously generated embeddings for {len(batch_texts)} texts"
-                )
-                cached_texts, new_texts = self.redis_cache.check_batch(batch_texts)
-                if cached_texts:
+                # Check for which texts embeddings are saved if a cache is existing
+                if self.redis_cache:
                     self.logger.debug(
-                        f"Retrieving {len(cached_texts)} previous generated embeddings from cache"
+                        f"Checking cache for previously generated embeddings for {len(batch_texts)} texts"
                     )
-                    cached_embeddings = self.redis_cache.get_batch(cached_texts)
-
-            # Try to get embeddings for the (new texts ot the) batch from the API
-            if new_texts:
-                try:
-                    self.logger.debug(
-                        f"Generating new embeddings for {len(new_texts)} texts"
+                    cached_texts, new_texts, cached_embeddings = (
+                        self.redis_cache.get_cached_and_new_batch(batch_texts)
                     )
-                    embedding_response = self.client.embeddings.create(
-                        input=new_texts,
-                        model=self.model_name,
-                        encoding_format="float",
-                        extra_body={**kwargs},
-                    )
-
-                    # Process all embeddings from the batch response
-                    for i, _ in enumerate(new_texts):
-                        generated_embeddings.append(
-                            embedding_response.data[i].embedding
-                        )
-
-                    # Store all generated embddings in cache if existing
-                    if self.redis_cache:
+                    if cached_texts:
                         self.logger.debug(
-                            f"Storing {len(generated_embeddings)} generated embeddings in cache"
-                        )
-                        self.redis_cache.add_batch(new_texts, generated_embeddings)
-
-                # Retur 0's if call to API was not successful
-                except OpenAIError:
-                    self.logger.warning("Call to API NOT successful! Returning 0's.")
-                    for _ in new_texts:
-                        generated_embeddings.append(
-                            [0 for _ in range(self.embedding_dimensions)]
+                            f"Retrieved {len(cached_texts)} previously generated embeddings from cache"
                         )
 
+                # Try to get embeddings for the (new texts ot the) batch from the API
+                if new_texts:
+                    try:
+                        self.logger.debug(
+                            f"Generating new embeddings for {len(new_texts)} texts"
+                        )
+                        embedding_response = self.client.embeddings.create(
+                            input=new_texts,
+                            model=self.model_name,
+                            encoding_format="float",
+                            extra_body={**kwargs},
+                        )
+
+                        # Process all embeddings from the batch response
+                        for i, _ in enumerate(new_texts):
+                            generated_embeddings.append(
+                                embedding_response.data[i].embedding
+                            )
+
+                        # Store all generated embddings in cache if existing
+                        if self.redis_cache:
+                            self.logger.debug(
+                                f"Storing {len(generated_embeddings)} generated embeddings in cache"
+                            )
+                            self.redis_cache.add_batch(new_texts, generated_embeddings)
+
+                    # Retur 0's if call to API was not successful
+                    except OpenAIError:
+                        self.logger.warning("Call to API NOT successful! Returning 0's.")
+                        for _ in new_texts:
+                            generated_embeddings.append(
+                                [0 for _ in range(self.embedding_dimensions)]
+                            )
+
+                # Combine list of cached and generated embeddings into return list
+                batch_embeddings = self.redis_cache.merge_embeddings(
+                    texts=batch_texts,
+                    new_texts=new_texts,
+                    cached_texts=cached_texts,
+                    generated_embeddings=generated_embeddings,
+                    cached_embeddings=cached_embeddings,
+                )
                 chunks.append(batch_embeddings)
 
         if not chunks:
@@ -588,6 +600,54 @@ class RedisCacheConnector:
         results = self.cache.mget(texts, self.model_name)
 
         return [result["embedding"] for result in results]
+
+    def get_cached_and_new_batch(
+        self, texts: list[str]
+    ) -> tuple[list[str], list[str], list[list[float]]]:
+        """
+        Fetch cache entries for all texts in a single cache round-trip and
+        split results into cached and uncached texts.
+
+        This avoids the ``mexists`` + ``mget`` two-call pattern.
+
+        Args:
+            texts (list[str]): A list of input texts.
+
+        Returns:
+            tuple[list[str], list[str], list[list[float]]]:
+                - cached_texts: texts found in cache
+                - new_texts: texts missing in cache
+                - cached_embeddings: embeddings in the same order as cached_texts
+        """
+        results = self.cache.mget(texts, self.model_name)
+
+        # Common case: mget returns one result per input in the same order.
+        if len(results) == len(texts):
+            cached_texts: list[str] = []
+            new_texts: list[str] = []
+            cached_embeddings: list[list[float]] = []
+
+            for text, result in zip(texts, results):
+                if result and "embedding" in result:
+                    cached_texts.append(text)
+                    cached_embeddings.append(result["embedding"])
+                else:
+                    new_texts.append(text)
+
+            return cached_texts, new_texts, cached_embeddings
+
+        # Fallback for APIs that return only hits instead of aligned output.
+        hit_map = {
+            result["content"]: result["embedding"]
+            for result in results
+            if result and "content" in result and "embedding" in result
+        }
+
+        cached_texts = [text for text in texts if text in hit_map]
+        new_texts = [text for text in texts if text not in hit_map]
+        cached_embeddings = [hit_map[text] for text in cached_texts]
+
+        return cached_texts, new_texts, cached_embeddings
 
     def merge_embeddings(
             self, 
