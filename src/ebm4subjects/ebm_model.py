@@ -198,7 +198,6 @@ class EbmModel:
                 "embedding_cache_url is set but embedding_model_name is None. "
             )
 
-
         embedding_dimensions = int(self.embedding_dimensions)
         embedding_model_args = params.get(
             "embedding_model_args", self.embedding_model_args
