@@ -1,6 +1,6 @@
 [project]
 name = "ebm4subjects"
-version = "0.6.0"
+version = "0.7.0"
 description = "Embedding Based Matching for Automated Subject Indexing"
 authors = [
     {name = "Deutsche Nationalbibliothek"},
@@ -34,6 +34,7 @@ dependencies = [
     "pyarrow>=21.0.0",
     "pyoxigraph>=0.4.11",
     "rdflib~=7.1.3",
+    "redisvl>=0.18.1",
     "xgboost>=3.0.2",
 ]
 [project.optional-dependencies]

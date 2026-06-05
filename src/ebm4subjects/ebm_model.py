@@ -43,11 +43,13 @@ class EbmModel:
         collection_name: str = "my_collection",
         use_altLabels: bool = True,
         hnsw_index_params: dict | str | None = None,
-        embedding_model_name: str | None = None,
+        embedding_model_name: str | None = "my_model",
         embedding_model_deployment: str = "mock",
         embedding_model_args: dict | str | None = None,
         encode_args_vocab: dict | str | None = None,
         encode_args_documents: dict | str | None = None,
+        embedding_cache_url: str = "",
+        embedding_cache_ttl: int = None,
         log_path: str | None = None,
         logger: logging.Logger | None = None,
         logging_level: str = "info",
@@ -104,6 +106,10 @@ class EbmModel:
         self.embedding_model_args = embedding_model_args
         self.encode_args_vocab = encode_args_vocab
         self.encode_args_documents = encode_args_documents
+
+        # Parameter for embedding cache
+        self.embedding_cache_url = embedding_cache_url
+        self.embedding_cache_ttl = embedding_cache_ttl
 
         # Parameters for chunker
         self.chunk_tokenizer = chunk_tokenizer
@@ -187,6 +193,11 @@ class EbmModel:
             "embedding_model_deployment", self.embedding_model_deployment
         ).lower()
         model_name = self.embedding_model_name
+        if self.embedding_cache_url and self.embedding_model_name is None:
+            raise ValueError(
+                "embedding_cache_url is set but embedding_model_name is None. "
+            )
+
         embedding_dimensions = int(self.embedding_dimensions)
         embedding_model_args = params.get(
             "embedding_model_args", self.embedding_model_args
@@ -204,6 +215,8 @@ class EbmModel:
                     model_name=model_name,
                     embedding_dimensions=embedding_dimensions,
                     logger=self.logger,
+                    cache_url=self.embedding_cache_url,
+                    cache_ttl=self.embedding_cache_ttl,
                     **embedding_model_args,
                 )
             elif embedding_model_deployment == "mock":
@@ -215,6 +228,8 @@ class EbmModel:
                     model_name=model_name,
                     embedding_dimensions=embedding_dimensions,
                     logger=self.logger,
+                    cache_url=self.embedding_cache_url,
+                    cache_ttl=self.embedding_cache_ttl,
                     **embedding_model_args,
                 )
             elif embedding_model_deployment == "openai":
@@ -223,6 +238,8 @@ class EbmModel:
                     model_name=model_name,
                     embedding_dimensions=embedding_dimensions,
                     logger=self.logger,
+                    cache_url=self.embedding_cache_url,
+                    cache_ttl=self.embedding_cache_ttl,
                     **embedding_model_args,
                 )
             else:
