@@ -1,4 +1,5 @@
 from threading import Thread
+from typing import Any
 
 import duckdb
 import polars as pl
@@ -23,8 +24,8 @@ class Duckdb_client:
     def __init__(
         self,
         db_path: str,
-        config: dict = {"hnsw_enable_experimental_persistence": True, "threads": 1},
-        hnsw_index_params: dict = {"M": 32, "ef_construction": 256, "ef_search": 256},
+        config: dict[str, Any] | None = None,
+        hnsw_index_params: dict[str, Any] | None = None,
     ) -> None:
         """
         Initializes the Duckdb_client.
@@ -40,6 +41,11 @@ class Duckdb_client:
             'hnsw_enable_experimental_persistence' needs to be set to 'True' in order
             to store and query the index later
         """
+        if hnsw_index_params is None:
+            hnsw_index_params = {"M": 32, "ef_construction": 256, "ef_search": 256}
+        if config is None:
+            config = {"hnsw_enable_experimental_persistence": True, "threads": 1}
+
         # Establish a connection to the DuckDB database
         self.connection = duckdb.connect(
             database=db_path,
@@ -300,8 +306,7 @@ class Duckdb_client:
         )
 
         # apply oversearch to reduce sensitivity in MinMax scaling
-        if limit < 100:
-            limit = 100
+        limit = max(limit, 100)
 
         # Set the HNSW index parameters for search
         thread_connection.execute(
