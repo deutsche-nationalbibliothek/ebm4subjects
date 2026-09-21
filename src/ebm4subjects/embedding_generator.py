@@ -65,7 +65,9 @@ class EmbeddingGeneratorAPI(EmbeddingGenerator):
         self.model_name = model_name
 
         if not (api_key := os.environ.get("OPENAI_API_KEY")):
-            api_key = ""
+            # OpenAI SDK requires a non-empty API key, even for local testing
+            # from version 2.34.0
+            api_key = "hello-world"
 
         self.client = OpenAI(api_key=api_key, base_url=kwargs.get("api_address"))
 
@@ -165,9 +167,9 @@ class EmbeddingGeneratorAPI(EmbeddingGenerator):
                             self.redis_cache.add_batch(new_texts, generated_embeddings)
 
                     # Retur 0's if call to API was not successful
-                    except OpenAIError:
+                    except OpenAIError as error:
                         self.logger.warning(
-                            "Call to API NOT successful! Returning 0's."
+                            f"Call to API NOT successful! Returning 0's: {error}"
                         )
                         for _ in new_texts:
                             generated_embeddings.append(
