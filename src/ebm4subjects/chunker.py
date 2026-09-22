@@ -1,10 +1,114 @@
 from concurrent.futures import ProcessPoolExecutor
+from dataclasses import dataclass
 from math import ceil
 from typing import Any
 
 import polars as pl
 
 from ebm4subjects.analyzer import EbmAnalyzer
+
+
+@dataclass(frozen=True)
+class ProcessArgs:
+    """
+    A class to represent the arguments for processing text chunks.
+
+    Attributes:
+        max_sentence_count (int): The maximum number of sentences allowed in a chunk.
+        max_chunk_length (int): The maximum length of a chunk in terms of characters.
+        max_chunk_count (int): The maximum number of chunks to be processed.
+    """
+
+    max_sentence_count: int
+    max_chunk_length: int
+    max_chunk_count: int
+
+
+def chunk(sentences: list[str], process_args: ProcessArgs) -> list[str]:
+    """
+    Splits a list of sentences into chunks based on specified constraints.
+
+    Args:
+        sentences (list[str]): A list of sentences to be chunked.
+        process_args (ProcessArgs): An instance of ProcessArgs containing
+            the maximum sentence count, maximum chunk length, and maximum chunk count.
+
+    Returns:
+        list[str]: A list of string chunks created from the input sentences.
+    """
+    # Initialize an empty list to store the chunks
+    chunks = []
+
+    sentences = sentences[: process_args.max_sentence_count]
+
+    # Initialize an empty list to store the current chunk
+    current_chunk = []
+
+    # Iterate over the sentences
+    for sentence in sentences:
+        # If the current chunk is not full, add the sentence to it
+        if len(" ".join(current_chunk)) < process_args.max_chunk_length:
+            current_chunk.append(sentence)
+        # Otherwise, add the current chunk to the list of chunks
+        # and start a new chunk
+        else:
+            chunks.append(" ".join(current_chunk))
+            current_chunk = [sentence]
+            if len(chunks) == process_args.max_chunk_count:
+                break
+
+    # If the maximum number of chunks is reached, break the loop
+    if current_chunk and len(chunks) < process_args.max_chunk_count:
+        chunks.append(" ".join(current_chunk))
+
+    # Return the chunked text
+    return chunks
+
+
+def chunk_parallel(
+    args: tuple[list[str], list[list[str]], ProcessArgs],
+) -> tuple[list[str], list[pl.DataFrame]]:
+    """
+    Chunks a batch of texts into smaller sections.
+
+    Args:
+        args (tuple[list[str], list[list[str]], ProcessArgs]): A tuple containing
+            the list of document IDs, the list of tokenized texts, and an instance
+            of ProcessArgs containing the maximum sentence count, maximum chunk length,
+            and maximum chunk count.
+
+    Returns:
+        tuple[list[str], list[pl.DataFrame]]: A tuple containing the list
+            of chunked text sections and the list of chunk indices.
+    """
+    batch_doc_ids, batch_texts, process_args = args
+
+    # Initialize empty lists to store the chunks and chunk indices
+    batch_chunks = []
+    batch_chunk_indices = []
+
+    # Iterate over the texts in the batch
+    for doc_id, text in zip(batch_doc_ids, batch_texts):
+        # Chunk the text into smaller sections
+        new_chunks = chunk(text, process_args)
+        n_chunks = len(new_chunks)
+
+        # Create a DataFrame to store the chunk indices
+        chunk_df = pl.DataFrame(
+            {
+                "query_doc_id": [doc_id] * n_chunks,
+                "chunk_position": list(range(n_chunks)),
+                "n_chunks": [n_chunks] * n_chunks,
+            }
+        )
+
+        # Add the chunked text sections and chunk indices to the lists
+        if new_chunks:
+            batch_chunks.extend(new_chunks)
+            batch_chunk_indices.append(chunk_df)
+
+    # Return the chunked texts and the list of chunk indices
+    return batch_chunks, batch_chunk_indices
 
 
 class Chunker:
@@ -63,35 +167,17 @@ class Chunker:
         Returns:
             list[str]: A list of chunked text sections.
         """
-        # Initialize an empty list to store the chunks
-        chunks = []
-
         # Tokenize the text into sentences
         sentences = self.tokenizer.tokenize_sentences(text)
-        sentences = sentences[: self.max_sentence_count]
 
-        # Initialize an empty list to store the current chunk
-        current_chunk = []
-
-        # Iterate over the sentences
-        for sentence in sentences:
-            # If the current chunk is not full, add the sentence to it
-            if len(" ".join(current_chunk)) < self.max_chunk_length:
-                current_chunk.append(sentence)
-            # Otherwise, add the current chunk to the list of chunks
-            # and start a new chunk
-            else:
-                chunks.append(" ".join(current_chunk))
-                current_chunk = [sentence]
-                if len(chunks) == self.max_chunk_count:
-                    break
-
-        # If the maximum number of chunks is reached, break the loop
-        if current_chunk and len(chunks) < self.max_chunk_count:
-            chunks.append(" ".join(current_chunk))
-
-        # Return the chunked text
-        return chunks
+        return chunk(
+            sentences,
+            ProcessArgs(
+                self.max_sentence_count,
+                self.max_chunk_length,
+                self.max_chunk_count,
+            ),
+        )
 
     def chunk_batches(
         self, texts: list[str], doc_ids: list[str], chunking_jobs: int
@@ -119,14 +205,24 @@ class Chunker:
         batch_args = [
             (
                 doc_ids[i * chunking_batch_size : (i + 1) * chunking_batch_size],
-                texts[i * chunking_batch_size : (i + 1) * chunking_batch_size],
+                [
+                    self.tokenizer.tokenize_sentences(text)
+                    for text in texts[
+                        i * chunking_batch_size : (i + 1) * chunking_batch_size
+                    ]
+                ],
+                ProcessArgs(
+                    self.max_sentence_count,
+                    self.max_chunk_length,
+                    self.max_chunk_count,
+                ),
             )
             for i in range(chunking_jobs)
         ]
 
         # Use ProcessPoolExecutor to chunk the batches in parallel
         with ProcessPoolExecutor(max_workers=chunking_jobs) as executor:
-            results = list(executor.map(self._chunk_batch, batch_args))
+            results = list(executor.map(chunk_parallel, batch_args))
 
         # Flatten the results into a single list of chunked text sections
         # and a single list of chunk indices
@@ -136,44 +232,3 @@ class Chunker:
 
         # Return the chunked texts and corresponding chunk indices
         return text_chunks, chunk_index
-
-    def _chunk_batch(self, args) -> tuple[list[str], list[pl.DataFrame]]:
-        """
-        Chunks a batch of texts into smaller sections.
-
-        Args:
-            args (tuple[list[str], list[str]]): A tuple containing the batch
-                of document IDs and the batch of texts.
-
-        Returns:
-            tuple[list[str], list[pl.DataFrame]]: A tuple containing the list
-                of chunked text sections and the list of chunk indices.
-        """
-        batch_doc_ids, batch_texts = args
-
-        # Initialize empty lists to store the chunks and chunk indices
-        batch_chunks = []
-        batch_chunk_indices = []
-
-        # Iterate over the texts in the batch
-        for doc_id, text in zip(batch_doc_ids, batch_texts):
-            # Chunk the text into smaller sections
-            new_chunks = self.chunk_text(text)
-            n_chunks = len(new_chunks)
-
-            # Create a DataFrame to store the chunk indices
-            chunk_df = pl.DataFrame(
-                {
-                    "query_doc_id": [doc_id] * n_chunks,
-                    "chunk_position": list(range(n_chunks)),
-                    "n_chunks": [n_chunks] * n_chunks,
-                }
-            )
-
-            # Add the chunked text sections and chunk indices to the lists
-            if new_chunks:
-                batch_chunks.extend(new_chunks)
-                batch_chunk_indices.append(chunk_df)
-
-        # Return the chunked texts and the list of chunk indices
-        return batch_chunks, batch_chunk_indices
