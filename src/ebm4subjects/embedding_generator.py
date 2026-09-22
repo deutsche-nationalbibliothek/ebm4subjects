@@ -17,7 +17,6 @@ class EmbeddingGenerator:
         """
         Base method for the initialization of an EmbeddingGenerator.
         """
-        pass
 
     def generate_embeddings(self, texts: list[str], **kwargs) -> np.ndarray:
         """
@@ -31,7 +30,6 @@ class EmbeddingGenerator:
             np.ndarray: A numpy array of shape (len(texts), embedding_dimensions)
                 containing the generated embeddings.
         """
-        pass
 
 
 class EmbeddingGeneratorAPI(EmbeddingGenerator):
@@ -45,7 +43,7 @@ class EmbeddingGeneratorAPI(EmbeddingGenerator):
         embedding_dimensions: int,
         logger: logging.Logger,
         cache_url: str = "",
-        cache_ttl: int = None,
+        cache_ttl: int | None = None,
         **kwargs,
     ) -> None:
         """
@@ -67,7 +65,9 @@ class EmbeddingGeneratorAPI(EmbeddingGenerator):
         self.model_name = model_name
 
         if not (api_key := os.environ.get("OPENAI_API_KEY")):
-            api_key = ""
+            # OpenAI SDK requires a non-empty API key, even for local testing
+            # from version 2.34.0
+            api_key = "hello-world"
 
         self.client = OpenAI(api_key=api_key, base_url=kwargs.get("api_address"))
 
@@ -167,24 +167,27 @@ class EmbeddingGeneratorAPI(EmbeddingGenerator):
                             self.redis_cache.add_batch(new_texts, generated_embeddings)
 
                     # Retur 0's if call to API was not successful
-                    except OpenAIError:
+                    except OpenAIError as error:
                         self.logger.warning(
-                            "Call to API NOT successful! Returning 0's."
+                            f"Call to API NOT successful! Returning 0's: {error}"
                         )
                         for _ in new_texts:
                             generated_embeddings.append(
                                 [0 for _ in range(self.embedding_dimensions)]
                             )
 
-                # Combine list of cached and generated embeddings into return list
-                batch_embeddings = self.redis_cache.merge_embeddings(
-                    texts=batch_texts,
-                    new_texts=new_texts,
-                    cached_texts=cached_texts,
-                    generated_embeddings=generated_embeddings,
-                    cached_embeddings=cached_embeddings,
-                )
-                chunks.append(batch_embeddings)
+                # If a cache is existing, merge the cached and generated embeddings
+                if self.redis_cache:
+                    batch_embeddings = self.redis_cache.merge_embeddings(
+                        texts=batch_texts,
+                        new_texts=new_texts,
+                        cached_texts=cached_texts,
+                        generated_embeddings=generated_embeddings,
+                        cached_embeddings=cached_embeddings,
+                    )
+                    chunks.append(batch_embeddings)
+                else:
+                    chunks.append(generated_embeddings)
 
         if not chunks:
             return np.empty((0, self.embedding_dimensions), dtype=np.float32)
@@ -204,7 +207,7 @@ class EmbeddingGeneratorInProcess(EmbeddingGenerator):
         embedding_dimensions: int,
         logger: logging.Logger,
         cache_url: str = "",
-        cache_ttl: int = None,
+        cache_ttl: int | None = None,
         **kwargs,
     ) -> None:
         """
@@ -311,7 +314,8 @@ class EmbeddingGeneratorInProcess(EmbeddingGenerator):
                 )
 
                 # Split into batches and call add_batch in a loop
-                cache_batch_size = 1024  # Use a reasonable batch size for cache storage
+                # Use a reasonable batch size for cache storage
+                cache_batch_size = 1024 
                 for j in tqdm(
                     range(0, len(new_texts), cache_batch_size),
                     "Storing newly generated embeddings in cache...",
@@ -324,15 +328,20 @@ class EmbeddingGeneratorInProcess(EmbeddingGenerator):
                         batch_new_texts, batch_generated_embeddings
                     )
 
-        # Combine list of cached and generated embeddings into return list
-        self.logger.debug("Combine cached and new embeddings")
-        return self.redis_cache.merge_embeddings(
-            texts=texts,
-            new_texts=new_texts,
-            cached_texts=cached_texts,
-            generated_embeddings=generated_embeddings,
-            cached_embeddings=cached_embeddings,
-        )
+        # If a cache is existing, merge the cached and generated embeddings
+        if self.redis_cache:
+            self.logger.debug("Combine cached and new embeddings")
+            result = self.redis_cache.merge_embeddings(
+                texts=texts,
+                new_texts=new_texts,
+                cached_texts=cached_texts,
+                generated_embeddings=generated_embeddings,
+                cached_embeddings=cached_embeddings,
+            )
+        else:
+            result = generated_embeddings
+
+        return result
 
 
 class EmbeddingGeneratorMock(EmbeddingGenerator):
@@ -381,7 +390,7 @@ class RedisCacheConnector:
         self,
         model_name: str,
         cache_url: str = "redis://localhost:6379",
-        cache_ttl: int = None,
+        cache_ttl: int | None = None,
     ) -> None:
         """
         Initializes the connection to the set up redis cache.

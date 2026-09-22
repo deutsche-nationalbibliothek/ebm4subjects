@@ -1,6 +1,6 @@
 [project]
 name = "ebm4subjects"
-version = "0.8.0"
+version = "0.8.1"
 description = "Embedding Based Matching for Automated Subject Indexing"
 authors = [
     {name = "Deutsche Nationalbibliothek"},
@@ -35,10 +35,14 @@ dependencies = [
     "pyoxigraph>=0.4.11",
     "rdflib~=7.1.3",
     "redisvl>=0.18.1",
-    "xgboost>=3.0.2",
+    "tqdm>=4.67.1",
+    "xgboost-cpu>=3.2.0",
 ]
 [project.optional-dependencies]
-in-process=["sentence-transformers>=5.0.0"]
+in-process=[
+    "sentence-transformers>=5.0.0",
+    "xgboost>=3.2.0",
+]
 
 [build-system]
 requires = ["hatchling"]

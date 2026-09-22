@@ -14,10 +14,47 @@ from ebm4subjects.chunker import Chunker
 from ebm4subjects.duckdb_client import Duckdb_client
 from ebm4subjects.ebm_logging import EbmLogger, NullLogger, XGBLogging
 from ebm4subjects.embedding_generator import (
+    EmbeddingGeneratorAPI,
     EmbeddingGeneratorInProcess,
     EmbeddingGeneratorMock,
-    EmbeddingGeneratorAPI,
 )
+
+
+def make_unique_preserve_order(
+    list_one: list[Any], list_two: list[Any]
+) -> tuple[list[Any], list[Any]]:
+    """
+    Create two new lists that contain unique pairs of elements from the input lists,
+    preserving the order of their first occurrence.
+
+    Args:
+        list_one (list[Any]): The first list of elements.
+        list_two (list[Any]): The second list of elements.
+
+    Returns:
+        tuple[list[Any], list[Any]]: A tuple containing two lists:
+            - The first list contains unique elements from list_one.
+            - The second list contains unique elements from list_two corresponding to
+              the unique elements in list_one.
+    """
+    # Lists to store unique elements from list_one and list_two
+    result_list_one: list[Any] = []
+    result_list_two: list[Any] = []
+    # Set to track seen pairs of elements
+    seen: set[Any] = set()
+
+    # Iterate through both lists simultaneously
+    for item_one, item_two in zip(list_one, list_two):
+        # Check if the pair (item_one, item_two) has not been seen before
+        if (item_one, item_two) not in seen:
+            # Mark the pair as seen
+            seen.add((item_one, item_two))
+            # Add unique item from list_one corresponding item from list_two
+            result_list_one.append(item_one)
+            result_list_two.append(item_two)
+
+    # Return the unique lists
+    return result_list_one, result_list_two
 
 
 class EbmModel:
@@ -48,7 +85,7 @@ class EbmModel:
         encode_args_vocab: dict | str | None = None,
         encode_args_documents: dict | str | None = None,
         embedding_cache_url: str = "",
-        embedding_cache_ttl: int = None,
+        embedding_cache_ttl: int | None = None,
         log_path: str | None = None,
         logger: logging.Logger | None = None,
         logging_level: str = "info",
@@ -135,7 +172,7 @@ class EbmModel:
         # Initialize EBM model
         self.model = None
 
-    def _init_duckdb_client(self, params: dict[str:Any] = {}) -> None:
+    def _init_duckdb_client(self, params: dict[str:Any] | None = None) -> None:
         """
         Initializes the DuckDB client if it does not already exist.
 
@@ -150,6 +187,9 @@ class EbmModel:
         Returns:
             None
         """
+        if params is None:
+            params = {}
+
         # parse duckdb client params
         duckdb_threads = int(params.get("duckdb_threads", self.duckdb_threads))
         db_path = params.get("db_path", self.db_path)
@@ -173,7 +213,7 @@ class EbmModel:
                 hnsw_index_params=hnsw_index_params,
             )
 
-    def _init_generator(self, params: dict[str:Any] = {}) -> None:
+    def _init_generator(self, params: dict[str:Any] | None = None) -> None:
         """
         Initializes the embedding generator if it does not already exist.
 
@@ -187,6 +227,9 @@ class EbmModel:
         Returns:
             None
         """
+        if params is None:
+            params = {}
+
         # parse embedding generator params
         embedding_model_deployment = params.get(
             "embedding_model_deployment", self.embedding_model_deployment
@@ -351,7 +394,7 @@ class EbmModel:
         label_ids: list[str],
         texts: list[str],
         train_candidates: pl.DataFrame = None,
-        params: dict[str:Any] = {},
+        params: dict[str:Any] | None = None,
     ) -> pl.DataFrame:
         """
         Prepares the training data for the EBM model.
@@ -372,11 +415,15 @@ class EbmModel:
         Returns:
             pl.DataFrame: The prepared training data.
         """
+        if params is None:
+            params = {}
+
         # Check if pre-computed candidate training data is provided
         # If not, generate candidate training data in batches
         if not train_candidates:
+            train_texts, train_doc_ids = make_unique_preserve_order(texts, doc_ids)
             train_candidates = self.generate_candidates_batch(
-                texts=texts, doc_ids=doc_ids, params=params
+                texts=train_texts, doc_ids=train_doc_ids, params=params
             )
 
         # Create a gold standard data frame from the provided doc IDs and label IDs
@@ -456,7 +503,7 @@ class EbmModel:
         )
 
     def generate_candidates(
-        self, text: str, doc_id: int, params: dict[str:Any] = {}
+        self, text: str, doc_id: int, params: dict[str:Any] | None = None
     ) -> pl.DataFrame:
         """
         Generates candidate labels for a given text and document ID.
@@ -473,6 +520,9 @@ class EbmModel:
         Returns:
             pl.DataFrame: A DataFrame containing the generated candidate labels.
         """
+        if params is None:
+            params = {}
+
         # process text if not empty
         if text:
             # Create a Chunker instance with specified parameters
@@ -586,7 +636,7 @@ class EbmModel:
         self,
         texts: list[str],
         doc_ids: list[int],
-        params: dict[str:Any] = {},
+        params: dict[str:Any] | None = None,
     ) -> pl.DataFrame:
         """
         Generates candidate labels for a batch of given texts and document IDs.
@@ -603,6 +653,9 @@ class EbmModel:
         Returns:
             pl.DataFrame: A DataFrame containing the generated candidate labels.
         """
+        if params is None:
+            params = {}
+
         # Create a Chunker instance with specified parameters
         chunker = Chunker(
             self.chunk_tokenizer,

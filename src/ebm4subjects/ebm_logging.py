@@ -39,7 +39,7 @@ class EbmLogger:
         else:
             self.logger.setLevel(logging.NOTSET)
 
-        # Create a file handler to log messages to a file 
+        # Create a file handler to log messages to a file
         if not self.logger.handlers:
             log_file_handler = logging.FileHandler(f"{log_path}/ebm.log")
             log_file_handler.setFormatter(
@@ -72,7 +72,6 @@ class NullLogger:
         """
         Initializes the null logger.
         """
-        pass
 
     def debug(self, *args, **kwargs):
         """
@@ -82,7 +81,6 @@ class NullLogger:
             *args: The message to log.
             **kwargs: Additional keyword arguments.
         """
-        pass
 
     def info(self, *args, **kwargs):
         """
@@ -92,7 +90,6 @@ class NullLogger:
             *args: The message to log.
             **kwargs: Additional keyword arguments.
         """
-        pass
 
     def warn(self, *args, **kwargs):
         """
@@ -102,7 +99,6 @@ class NullLogger:
             *args: The message to log.
             **kwargs: Additional keyword arguments.
         """
-        pass
 
     def warning(self, *args, **kwargs):
         """
@@ -112,7 +108,6 @@ class NullLogger:
             *args: The message to log.
             **kwargs: Additional keyword arguments.
         """
-        pass
 
     def error(self, *args, **kwargs):
         """
@@ -122,7 +117,6 @@ class NullLogger:
             *args: The message to log.
             **kwargs: Additional keyword arguments.
         """
-        pass
 
     def critical(self, *args, **kwargs):
         """
@@ -132,7 +126,6 @@ class NullLogger:
             *args: The message to log.
             **kwargs: Additional keyword arguments.
         """
-        pass
 
 
 class XGBLogging(xgboost.callback.TrainingCallback):

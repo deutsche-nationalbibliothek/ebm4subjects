@@ -53,7 +53,7 @@ def parse_vocab(vocab_path: str, use_altLabels: bool = True) -> pl.DataFrame:
 
 
 def add_vocab_embeddings(
-    vocab: pl.DataFrame, generator: EmbeddingGenerator, encode_args: dict = None
+    vocab: pl.DataFrame, generator: EmbeddingGenerator, encode_args: dict | None = None
 ):
     """
     Adds vocabulary embeddings to the given DataFrame.

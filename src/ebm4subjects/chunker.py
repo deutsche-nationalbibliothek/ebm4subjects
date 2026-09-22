@@ -1,6 +1,6 @@
 from concurrent.futures import ProcessPoolExecutor
 from math import ceil
-from typing import Any, Tuple
+from typing import Any
 
 import polars as pl
 
@@ -95,7 +95,7 @@ class Chunker:
 
     def chunk_batches(
         self, texts: list[str], doc_ids: list[str], chunking_jobs: int
-    ) -> Tuple[list[str], list[pl.DataFrame]]:
+    ) -> tuple[list[str], list[pl.DataFrame]]:
         """
         Chunks a list of texts into smaller sections in parallel
         using multiple processes.
@@ -137,7 +137,7 @@ class Chunker:
         # Return the chunked texts and corresponding chunk indices
         return text_chunks, chunk_index
 
-    def _chunk_batch(self, args) -> Tuple[list[str], list[pl.DataFrame]]:
+    def _chunk_batch(self, args) -> tuple[list[str], list[pl.DataFrame]]:
         """
         Chunks a batch of texts into smaller sections.
 
