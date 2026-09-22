@@ -7,6 +7,37 @@ import polars as pl
 
 from ebm4subjects.analyzer import EbmAnalyzer
 
+def split_sentence(sentence: str, max_chunk_length: int) -> list[str]:
+    """
+    Recursively splits a sentence at a blank space near its middle until
+    every resulting piece is within the maximum chunk length.
+
+    Args:
+        sentence (str): The sentence to split.
+        max_chunk_length (int): The maximum allowed length of a piece.
+
+    Returns:
+        list[str]: A list of sentence pieces, each at most max_chunk_length long.
+    """
+    if len(sentence) <= max_chunk_length:
+        return [sentence]
+
+    middle = len(sentence) // 2
+    split_at = sentence.rfind(" ", 0, middle)
+    if split_at == -1:
+        split_at = sentence.find(" ", middle)
+
+    # No blank space at all: fall back to a hard split to guarantee termination
+    if split_at == -1:
+        return [
+            sentence[i : i + max_chunk_length]
+            for i in range(0, len(sentence), max_chunk_length)
+        ]
+
+    return split_sentence(sentence[:split_at], max_chunk_length) + split_sentence(
+        sentence[split_at + 1 :], max_chunk_length
+    )
+
 
 @dataclass(frozen=True)
 class ProcessArgs:
@@ -42,10 +73,22 @@ def chunk(sentences: list[str], process_args: ProcessArgs) -> list[str]:
     sentences = sentences[: process_args.max_sentence_count]
 
     # Initialize an empty list to store the current chunk
-    current_chunk = []
 
     # Iterate over the sentences
+    short_sentences = []
     for sentence in sentences:
+
+        if len(sentence) > process_args.max_chunk_length:
+            short_sentences.extend(
+                split_sentence(sentence, process_args.max_chunk_length)
+            )
+        else:
+            short_sentences.append(sentence)
+
+    current_chunk = []
+
+    for sentence in short_sentences:
+
         # If the current chunk is not full, add the sentence to it
         if len(" ".join(current_chunk)) < process_args.max_chunk_length:
             current_chunk.append(sentence)
