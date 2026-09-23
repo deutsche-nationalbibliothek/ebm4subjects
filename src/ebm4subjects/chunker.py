@@ -7,6 +7,7 @@ import polars as pl
 
 from ebm4subjects.analyzer import EbmAnalyzer
 
+
 def split_sentence(sentence: str, max_chunk_length: int) -> list[str]:
     """
     Recursively splits a sentence at a blank space near its middle until
@@ -77,7 +78,6 @@ def chunk(sentences: list[str], process_args: ProcessArgs) -> list[str]:
     # Iterate over the sentences
     short_sentences = []
     for sentence in sentences:
-
         if len(sentence) > process_args.max_chunk_length:
             short_sentences.extend(
                 split_sentence(sentence, process_args.max_chunk_length)
@@ -88,7 +88,6 @@ def chunk(sentences: list[str], process_args: ProcessArgs) -> list[str]:
     current_chunk = []
 
     for sentence in short_sentences:
-
         # If the current chunk is not full, add the sentence to it
         if len(" ".join(current_chunk)) < process_args.max_chunk_length:
             current_chunk.append(sentence)
