@@ -331,6 +331,10 @@ class EbmModel:
         Raises:
             ValueError: If no vocabulary is provided.
         """
+        # Initialize the DuckDB client and embedding generator
+        self._init_duckdb_client()
+        self._init_generator()
+
         # Check if output path exists and load existing vocabulary if so
         if vocab_out_path and Path(vocab_out_path).exists():
             self.logger.info(
@@ -345,9 +349,7 @@ class EbmModel:
                 use_altLabels=self.use_altLabels,
             )
 
-            # Initialize generator and add embeddings to vocabulary
-            self._init_generator()
-
+            # Add embeddings to vocabulary
             encode_args_vocab = self.encode_args_vocab
             if isinstance(encode_args_vocab, str) or not encode_args_vocab:
                 encode_args_vocab = (
@@ -376,8 +378,7 @@ class EbmModel:
             # raise an error
             raise ValueError("vocabulary path is required")
 
-        # Initialize DuckDB client and create collection
-        self._init_duckdb_client()
+        # Create collection
         self.logger.info("creating collection")
         self.client.create_collection(
             collection_df=collection_df,
@@ -523,6 +524,10 @@ class EbmModel:
         if params is None:
             params = {}
 
+        # Initialize the DuckDB client and embedding generator
+        self._init_duckdb_client(params)
+        self._init_generator(params)
+
         # process text if not empty
         if text:
             # Create a Chunker instance with specified parameters
@@ -536,8 +541,6 @@ class EbmModel:
             # Chunk the input text
             text_chunks = chunker.chunk_text(text)
 
-            # Initialize the generator
-            self._init_generator(params)
             self.logger.info("creating embeddings for text chunks")
 
             # Parse the 'encode_args_documents' parameter
@@ -576,8 +579,6 @@ class EbmModel:
                 }
             )
 
-            # Initialize the DuckDB client
-            self._init_duckdb_client(params)
             query_jobs = int(params.get("query_jobs", self.query_jobs))
             self.logger.info(
                 f"running vector search and creating candidates with query_jobs: {query_jobs}"
@@ -656,6 +657,10 @@ class EbmModel:
         if params is None:
             params = {}
 
+        # Initialize the DuckDB client and embedding generator
+        self._init_duckdb_client(params)
+        self._init_generator(params)
+
         # Create a Chunker instance with specified parameters
         chunker = Chunker(
             self.chunk_tokenizer,
@@ -677,8 +682,7 @@ class EbmModel:
                 ast.literal_eval(encode_args_documents) if encode_args_documents else {}
             )
 
-        # Initialize the generator and chunk index
-        self._init_generator(params)
+        # Concatenate the chunk_index DataFrames and add a row index for query_id
         chunk_index = pl.concat(chunk_index).with_row_index("query_id")
         self.logger.info("creating embeddings for text chunks and query dataframe")
         embeddings = self.generator.generate_embeddings(
@@ -686,8 +690,6 @@ class EbmModel:
             **encode_args_documents,
         )
 
-        # Initialize the DuckDB client
-        self._init_duckdb_client(params)
         # Extend chunk_index by a list column containing the embeddings
         query_df = chunk_index.with_columns(pl.Series("embeddings", embeddings))
 
