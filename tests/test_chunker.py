@@ -1,4 +1,4 @@
-from ebm4subjects.chunker import ProcessArgs, chunk, split_sentence
+from ebm4subjects.chunker import ProcessArgsChunker, chunk, split_sentence
 
 
 class TestSplitSentence:
@@ -37,7 +37,7 @@ class TestChunk:
 
     def test_groups_short_sentences_into_single_chunk(self):
         sentences = ["one", "two", "three"]
-        process_args = ProcessArgs(
+        process_args = ProcessArgsChunker(
             max_sentence_count=10, max_chunk_length=100, max_chunk_count=10
         )
         result = chunk(sentences, process_args)
@@ -45,7 +45,7 @@ class TestChunk:
 
     def test_starts_new_chunk_once_length_exceeded(self):
         sentences = ["aaaaaaaaaa", "bbbbbbbbbb", "cccccccccc"]
-        process_args = ProcessArgs(
+        process_args = ProcessArgsChunker(
             max_sentence_count=10, max_chunk_length=10, max_chunk_count=10
         )
         result = chunk(sentences, process_args)
@@ -53,7 +53,7 @@ class TestChunk:
 
     def test_respects_max_sentence_count(self):
         sentences = ["one", "two", "three", "four"]
-        process_args = ProcessArgs(
+        process_args = ProcessArgsChunker(
             max_sentence_count=2, max_chunk_length=100, max_chunk_count=10
         )
         result = chunk(sentences, process_args)
@@ -61,21 +61,21 @@ class TestChunk:
 
     def test_respects_max_chunk_count(self):
         sentences = ["aaaaaaaaaa", "bbbbbbbbbb", "cccccccccc"]
-        process_args = ProcessArgs(
+        process_args = ProcessArgsChunker(
             max_sentence_count=10, max_chunk_length=10, max_chunk_count=2
         )
         result = chunk(sentences, process_args)
         assert result == ["aaaaaaaaaa", "bbbbbbbbbb"]
 
     def test_empty_sentence_list_returns_empty_chunks(self):
-        process_args = ProcessArgs(
+        process_args = ProcessArgsChunker(
             max_sentence_count=10, max_chunk_length=100, max_chunk_count=10
         )
         assert chunk([], process_args) == []
 
     def test_oversized_sentence_is_split_before_chunking(self):
         sentence = " ".join(["word"] * 20)
-        process_args = ProcessArgs(
+        process_args = ProcessArgsChunker(
             max_sentence_count=10, max_chunk_length=15, max_chunk_count=10
         )
         result = chunk([sentence], process_args)

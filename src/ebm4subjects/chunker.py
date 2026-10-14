@@ -41,7 +41,7 @@ def split_sentence(sentence: str, max_chunk_length: int) -> list[str]:
 
 
 @dataclass(frozen=True)
-class ProcessArgs:
+class ProcessArgsChunker:
     """
     A class to represent the arguments for processing text chunks.
 
@@ -56,7 +56,7 @@ class ProcessArgs:
     max_chunk_count: int
 
 
-def chunk(sentences: list[str], process_args: ProcessArgs) -> list[str]:
+def chunk(sentences: list[str], process_args: ProcessArgsChunker) -> list[str]:
     """
     Splits a list of sentences into chunks based on specified constraints.
 
@@ -108,7 +108,7 @@ def chunk(sentences: list[str], process_args: ProcessArgs) -> list[str]:
 
 
 def chunk_parallel(
-    args: tuple[list[str], list[list[str]], ProcessArgs],
+    args: tuple[list[str], list[list[str]], ProcessArgsChunker],
 ) -> tuple[list[str], list[pl.DataFrame]]:
     """
     Chunks a batch of texts into smaller sections.
@@ -214,7 +214,7 @@ class Chunker:
 
         return chunk(
             sentences,
-            ProcessArgs(
+            ProcessArgsChunker(
                 self.max_sentence_count,
                 self.max_chunk_length,
                 self.max_chunk_count,
@@ -253,7 +253,7 @@ class Chunker:
                         i * chunking_batch_size : (i + 1) * chunking_batch_size
                     ]
                 ],
-                ProcessArgs(
+                ProcessArgsChunker(
                     self.max_sentence_count,
                     self.max_chunk_length,
                     self.max_chunk_count,
