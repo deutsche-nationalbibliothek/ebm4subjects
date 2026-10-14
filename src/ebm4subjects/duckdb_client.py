@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+import os
 from typing import Any
 
 import duckdb
@@ -153,11 +154,14 @@ class Duckdb_client:
         self.db_config = config
 
         # Install and load the vss extension for DuckDB
-        with duckdb.connect(
-            database=self.db_path,
-            config=self.db_config,
-            read_only=True,
-        ) as connection:
+        connection_kwargs = {
+            "database": self.db_path,
+            "config": self.db_config,
+        }
+        if os.path.exists(self.db_path):
+            connection_kwargs["read_only"] = True
+
+        with duckdb.connect(**connection_kwargs) as connection:
             connection.install_extension("vss")
             connection.load_extension("vss")
 
