@@ -1,38 +1,68 @@
-from threading import Thread
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
+import os
 from typing import Any
 
 import duckdb
 import polars as pl
 
 
-def vss_thread_query(
-    connection: duckdb.DuckDBPyConnection,
-    queries: dict[str, Any],
-    collection_name: str,
-    vector_dimensions: int,
-    hnsw_metric_function: str = "array_cosine_distance",
-    ef_search: int = 256,
-    limit: int = 100,
-):
+@dataclass(frozen=True)
+class ProcessArgsDuckDB:
+    """
+    A class to represent the arguments for processing a vector search in DuckDB.
+
+    Attributes:
+        connection (duckdb.DuckDBPyConnection): The DuckDB connection object.
+        queries (dict[str, Any]): A dictionary containing the query data.
+        collection_name (str): The name of the collection to search against.
+        embedding_dimensions (int): The number of dimensions for the vector embeddings.
+        hnsw_metric_function (dict[str, Any]): The metric function to use for the HNSW index.
+        ef_search (int): The enter factor of search for the HNSW index.
+        n_hits (int): The number of hits to return per document.
+    """
+
+    connection: duckdb.DuckDBPyConnection
+    queries: dict[str, Any]
+    collection_name: str
+    embedding_dimensions: int
+    hnsw_metric_function: dict[str, Any]
+    ef_search: int
+    n_hits: int
+
+
+def vss_thread_query(process_args: ProcessArgsDuckDB) -> pl.DataFrame:
     """
     A helper function for performing the vector search in parallel.
 
     Args:
-        connection (duckdb.DuckDBPyConnection): The DuckDB connection object.
-        queries (dict[str, Any]): The queries to be searched against the collection.
-        collection_name (str): The name of the collection to search against.
-        vector_dimensions (int): The number of dimensions for the
-            vector embeddings.
-        hnsw_metric_function (str, optional): The metric function to use for the
-            HNSW index (default: "array_cosine_distance").
-        ef_search (int, optional): The enter factor of search for the HNSW index
-        limit (int, optional): The number of hits to return per document
-            (default: 100).
+        process_args (ProcessArgs): The arguments for processing the vector search.
+
+    Returns:
+        pl.DataFrame: The result of the vector search for the given process_args.
     """
+    hnsw_metric_function = (
+        process_args.hnsw_metric_function
+        if process_args.hnsw_metric_function
+        else "array_cosine_distance"
+    )
+    ef_search = process_args.ef_search if process_args.ef_search else 256
+    n_hits = process_args.n_hits if process_args.n_hits else 100
+
     # Create a temporary connection for the thread
-    with connection.cursor() as thread_connection:
+    with process_args.connection.cursor() as thread_connection:
+        # Create a temporary table to store the search results of the thread
+        thread_connection.execute("""CREATE OR REPLACE TEMP TABLE sub_results ( 
+                                id INTEGER,
+                                doc_id VARCHAR,
+                                chunk_position INTEGER,
+                                n_chunks INTEGER,
+                                label_id VARCHAR,
+                                is_prefLabel BOOLEAN,
+                                score FLOAT)""")
+
         # Convert the queries dictionary to a Polars DataFrame
-        queries_df = pl.DataFrame(queries)  # noqa: F841
+        queries_df = pl.DataFrame(process_args.queries)  # noqa: F841
 
         # Create a temporary table to store the search results
         thread_connection.execute(
@@ -41,7 +71,7 @@ def vss_thread_query(
                     query_doc_id VARCHAR,
                     chunk_position INTEGER,
                     n_chunks INTEGER,
-                    embeddings FLOAT[{vector_dimensions}])"""
+                    embeddings FLOAT[{process_args.embedding_dimensions}])"""
         )
 
         # Insert the data into the temporary table
@@ -50,14 +80,14 @@ def vss_thread_query(
         )
 
         # apply oversearch to reduce sensitivity in MinMax scaling
-        limit = max(limit, 100)
+        limit = max(n_hits, 100)
 
         # Set the HNSW index parameters for search
         thread_connection.execute(f"SET hnsw_ef_search = {ef_search}")
 
         # Perform the vector search
         thread_connection.execute(
-            f"""INSERT INTO results
+            f"""INSERT INTO sub_results
                 SELECT queries.query_id, 
                 queries.query_doc_id,
                 queries.chunk_position,
@@ -66,14 +96,16 @@ def vss_thread_query(
                 is_prefLabel,
                 (1 - intermed_score) AS score,
                 FROM queries, LATERAL (
-                    SELECT {collection_name}.label_id,
-                    {collection_name}.is_prefLabel,
-                    {hnsw_metric_function}(queries.embeddings, {collection_name}.embeddings) AS intermed_score
-                    FROM {collection_name}
+                    SELECT {process_args.collection_name}.label_id,
+                    {process_args.collection_name}.is_prefLabel,
+                    {hnsw_metric_function}(queries.embeddings, {process_args.collection_name}.embeddings) AS intermed_score
+                    FROM {process_args.collection_name}
                     ORDER BY intermed_score
                     LIMIT {limit}
                 )"""
         )
+
+        return thread_connection.execute("SELECT * FROM sub_results").pl()
 
 
 class Duckdb_client:
@@ -122,7 +154,14 @@ class Duckdb_client:
         self.db_config = config
 
         # Install and load the vss extension for DuckDB
-        with duckdb.connect(database=self.db_path, config=self.db_config) as connection:
+        connection_kwargs = {
+            "database": self.db_path,
+            "config": self.db_config,
+        }
+        if os.path.exists(self.db_path):
+            connection_kwargs["read_only"] = True
+
+        with duckdb.connect(**connection_kwargs) as connection:
             connection.install_extension("vss")
             connection.load_extension("vss")
 
@@ -231,49 +270,43 @@ class Duckdb_client:
             The argument 'chunk_size' is already set to the optimal value for the
             query processing with DuckDB. Only change it if necessary.
         """
-        with duckdb.connect(database=self.db_path, config=self.db_config) as connection:
-            # Create a temporary table to store the search results
-            connection.execute("""CREATE OR REPLACE TABLE results ( 
-                                    id INTEGER,
-                                    doc_id VARCHAR,
-                                    chunk_position INTEGER,
-                                    n_chunks INTEGER,
-                                    label_id VARCHAR,
-                                    is_prefLabel BOOLEAN,
-                                    score FLOAT)""")
-
+        with duckdb.connect(
+            database=self.db_path,
+            config=self.db_config,
+            read_only=True,
+        ) as connection:
             # Split the query data into chunks for parallel processing
             query_dfs = [
-                query_df.slice(i, chunk_size) for i in range(0, query_df.height, chunk_size)
+                query_df.slice(i, chunk_size)
+                for i in range(0, query_df.height, chunk_size)
             ]
-            batches = [query_dfs[i : i + n_jobs] for i in range(0, len(query_dfs), n_jobs)]
+            batches = [
+                query_dfs[i : i + n_jobs] for i in range(0, len(query_dfs), n_jobs)
+            ]
+
+            results: list[pl.DataFrame] = []
 
             # Perform the vector search in parallel
             for batch in batches:
-                threads: list[Thread] = []
-                for df in batch:
-                    threads.append(
-                        Thread(
-                            target=vss_thread_query,
-                            args=(
-                                connection,
-                                df.to_dict(as_series=False),
-                                collection_name,
-                                embedding_dimensions,
-                                hnsw_metric_function,
-                                self.hnsw_index_params["ef_search"],
-                                n_hits,
-                            ),
-                        )
+                batch_args: list = [
+                    ProcessArgsDuckDB(
+                        connection,
+                        df.to_dict(as_series=False),
+                        collection_name,
+                        embedding_dimensions,
+                        hnsw_metric_function,
+                        self.hnsw_index_params["ef_search"],
+                        n_hits,
                     )
+                    for df in batch
+                ]
 
-                for thread in threads:
-                    thread.start()
-                for thread in threads:
-                    thread.join()
+                # Use ProcessPoolExecutor to chunk the batches in parallel
+                with ThreadPoolExecutor(max_workers=len(batch)) as executor:
+                    results.extend(list(executor.map(vss_thread_query, batch_args)))
 
             # Retrieve the search results
-            result_df = connection.execute("SELECT * FROM results").pl()
+            result_df = pl.concat(results)
 
             # Apply MinMax scaling to the 'score' column per 'id'
             # and keep n_hits results
@@ -322,7 +355,9 @@ class Duckdb_client:
                 max_cosine_similarity=pl.col("cosine_similarity").max(),
                 first_occurrence=pl.col("chunk_position").min(),
                 last_occurrence=pl.col("chunk_position").max(),
-                spread=(pl.col("chunk_position").max() - pl.col("chunk_position").min()),
+                spread=(
+                    pl.col("chunk_position").max() - pl.col("chunk_position").min()
+                ),
                 is_prefLabel=pl.col("is_prefLabel").first(),
                 n_chunks=pl.col("n_chunks").first(),
             )
