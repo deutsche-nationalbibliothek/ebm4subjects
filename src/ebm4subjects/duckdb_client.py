@@ -1,6 +1,6 @@
+import os
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-import os
 from typing import Any
 
 import duckdb
