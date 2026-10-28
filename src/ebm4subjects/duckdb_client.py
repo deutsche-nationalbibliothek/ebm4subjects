@@ -105,7 +105,7 @@ def vss_thread_query(process_args: ProcessArgsDuckDB) -> pl.DataFrame:
                 )"""
         )
 
-        return thread_connection.execute("SELECT * FROM sub_results").pl()
+        return thread_connection.sql("SELECT * FROM sub_results").pl()
 
 
 class Duckdb_client:
