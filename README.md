@@ -1,7 +1,9 @@
 # Embedding Based Matching for Automated Subject Indexing
 
-> [!NOTE]
-> Work in progress. This repository is still under construction.
+[![status](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
+[![License](https://img.shields.io/badge/License-EUPL%201.2-blue.svg)](https://opensource.org/license/EUPL-1.2)
+[![PyPI Latest Release](https://img.shields.io/pypi/v/ebm4subjects.svg)](https://pypi.org/project/ebm4subjects/)
+[![PyPI Downloads](https://img.shields.io/pypi/dm/ebm4subjects.svg?label=PyPI%20downloads)](https://pypi.org/project/ebm4subjects/)
 
 This repository implements an algorithm for matching subjects with
 sentence transformer embeddings. While all functionality of this code
