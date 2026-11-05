@@ -671,7 +671,33 @@ class EbmModel:
         # Chunk the input texts
         chunking_jobs = int(params.get("chunking_jobs", self.chunking_jobs))
         self.logger.info(f"chunking texts with chunking_jobs: {chunking_jobs}")
-        text_chunks, chunk_index = chunker.chunk_batches(texts, doc_ids, chunking_jobs)
+
+        text_chunks: list[str] = []
+        chunk_index: list[pl.DataFrame] = []
+
+        # If chunking_jobs is set to 1, process each text sequentially
+        # Otherwise, use the chunk_batches method to process texts in parallel
+        # This is necessary because the chunk_batches method might cause problems
+        # if this process is run in parallel with other processes
+        if chunking_jobs == 1:
+            for text, doc_id in zip(texts, doc_ids):
+                chunks = chunker.chunk_text(text)
+                n_chunks = len(chunks)
+
+                text_chunks.extend(chunks)
+                chunk_index.append(
+                    pl.DataFrame(
+                        {
+                            "query_doc_id": [doc_id] * n_chunks,
+                            "chunk_position": list(range(n_chunks)),
+                            "n_chunks": [n_chunks] * n_chunks,
+                        }
+                    )
+                )
+        else:
+            text_chunks, chunk_index = chunker.chunk_batches(
+                texts, doc_ids, chunking_jobs
+            )
 
         # Parse the 'encode_args_documents' parameter
         encode_args_documents = params.get(
@@ -820,7 +846,9 @@ class EbmModel:
             # Store the trained model
             self.model = model
 
-    def predict(self, candidates: pl.DataFrame) -> list[pl.DataFrame]:
+    def predict(
+        self, candidates: pl.DataFrame, threads: int = -1
+    ) -> list[pl.DataFrame]:
         """
         Generates predictions for the given candidates using the trained model.
 
@@ -831,11 +859,16 @@ class EbmModel:
         Args:
             candidates (pl.DataFrame): A DataFrame containing the candidates to
                 generate predictions for.
+            threads (int, optional): The number of threads to use for parallel
+                processing in the XGBoost model (default: -1)
 
         Returns:
             list[pl.DataFrame]: A list of DataFrames, where each DataFrame contains
             the predicted scores and top-k labels for a document.
         """
+        # Set the number of threads for the XGBoost model
+        xgb.set_config(nthread=threads)
+
         # Select relevant columns from the candidates DataFrame to create a matrix
         # for the trained model to make predictions
         self.logger.info("creating matrix of candidates to generate predictions")
