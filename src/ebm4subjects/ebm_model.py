@@ -737,11 +737,12 @@ class EbmModel:
             hnsw_metric_function="array_cosine_distance",
         )
 
-        # add empty columns for documents without candidates
+        # Add empty columns for documents without candidates
+        candidates_doc_ids = set(candidates.get_column("doc_id").to_list())
         for missing_doc_id in [
             doc_id
             for doc_id in [str(d) for d in doc_ids]
-            if doc_id not in candidates.get_column("doc_id").to_list()
+            if doc_id not in candidates_doc_ids
         ]:
             candidates.extend(
                 pl.DataFrame(
