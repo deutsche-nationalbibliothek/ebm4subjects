@@ -737,30 +737,31 @@ class EbmModel:
             hnsw_metric_function="array_cosine_distance",
         )
 
-        # add empty columns for documents without candidates
-        for missing_doc_id in [
-            doc_id
-            for doc_id in [str(d) for d in doc_ids]
-            if doc_id not in candidates.get_column("doc_id").to_list()
-        ]:
-            candidates.extend(
-                pl.DataFrame(
-                    schema=candidates.schema,
-                    data={
-                        "doc_id": [str(missing_doc_id)],
-                        "label_id": None,
-                        "score": None,
-                        "occurrences": None,
-                        "min_cosine_similarity": None,
-                        "max_cosine_similarity": None,
-                        "first_occurrence": None,
-                        "last_occurrence": None,
-                        "spread": None,
-                        "is_prefLabel": None,
-                        "n_chunks": None,
-                    },
-                )
+        doc_ids_str = [str(doc_id) for doc_id in doc_ids]
+        existing_doc_ids = set(candidates.get_column("doc_id").to_list())
+        missing_doc_ids = [
+            doc_id for doc_id in doc_ids_str if doc_id not in existing_doc_ids
+        ]
+
+        if missing_doc_ids:
+            missing_count = len(missing_doc_ids)
+            missing_rows = pl.DataFrame(
+                {
+                    "doc_id": missing_doc_ids,
+                    "label_id": [None] * missing_count,
+                    "score": [None] * missing_count,
+                    "occurrences": [None] * missing_count,
+                    "min_cosine_similarity": [None] * missing_count,
+                    "max_cosine_similarity": [None] * missing_count,
+                    "first_occurrence": [None] * missing_count,
+                    "last_occurrence": [None] * missing_count,
+                    "spread": [None] * missing_count,
+                    "is_prefLabel": [None] * missing_count,
+                    "n_chunks": [None] * missing_count,
+                },
+                schema=candidates.schema,
             )
+            candidates.extend(missing_rows)
 
         # Return generated candidates
         return candidates
